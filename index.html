@@ -650,17 +650,14 @@ async function exportToExcel() {
       {width:17},{width:17},{width:14},{width:52},{width:36},
       {width:26},{width:26},{width:13},{width:13},{width:13},{width:13},{width:8},{width:8}
     ];
-    // Rows 1-9 empty (original format)
-    for(let i=1;i<=9;i++) sh2.getRow(i).height=5;
-
-    // Row 10 headers
+    // Row 1 headers
     const CI_HDRS = ['Año','Estatus','Sup','Platform','Cell','NP Actual','NPNuevo',
       'Cuenta liberada','Descripcion del cambio','Comentarios','Issue','Accion Correctiva',
       'PPAP\nEntregado','PPAP\nAprob','SOP Planeado','SOP\nReal','Mes','Semana'];
-    const hRow = sh2.getRow(10); hRow.height=36;
+    const hRow = sh2.getRow(1); hRow.height=36;
     CI_HDRS.forEach((h,i) => hdrCell(hRow.getCell(i+1), h));
-    sh2.views = [{state:'frozen',ySplit:10}];
-    sh2.autoFilter = {from:{row:10,column:1}, to:{row:10,column:18}};
+    sh2.views = [{state:'frozen',ySplit:1}];
+    sh2.autoFilter = {from:{row:1,column:1}, to:{row:1,column:18}};
 
     records.forEach((r,ri) => {
       const s = getStatus(r);
@@ -675,7 +672,7 @@ async function exportToExcel() {
         r.ppapEntregado, r.ppapAprob, r.sopPlaneado, r.sopReal,
         calcMes(r), calcSemana(r)
       ];
-      const dRow = sh2.getRow(11+ri); dRow.height=22;
+      const dRow = sh2.getRow(2+ri); dRow.height=22;
       vals.forEach((v,ci) => {
         const cell = dRow.getCell(ci+1);
         cell.value = v;
