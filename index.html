@@ -474,19 +474,63 @@ async function addPerson() {
   setSyncing(false);
 }
 
-// ── Export to Excel
+// ── Export to Excel (formato original)
 function exportToExcel() {
   const wb = XLSX.utils.book_new();
-  const hdr = ['#','Supervisor','Plataforma','Célula','NP Actual','NP Nuevo','Cuenta Liberada','Descripción','Comentarios','Issue','Acción Correctiva','PPAP Entregado','PPAP Aprobado','SOP Planeado','SOP Real','Estatus'];
-  const rows = records.map(r=>[r.id,r.sup,r.platform,r.cell,r.npActual,r.npNuevo,r.cuenta,r.descripcion,r.comentarios,r.issue,r.accionCorr,r.ppapEntregado,r.ppapAprob,r.sopPlaneado,r.sopReal,getStatus(r)]);
-  const ws1 = XLSX.utils.aoa_to_sheet([hdr,...rows]);
-  ws1['!cols'] = [5,12,11,7,16,16,13,45,35,25,25,13,13,13,13,13].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws1, 'Cambios CI');
 
-  const aHdr = ['Departamento','Persona',...meetingDates];
-  const aRows = people.map(p=>[p.dept,p.name,...meetingDates.map(d=>p.attendance?.[d]===1?'Sí':p.attendance?.[d]===0?'No':'')]);
-  const ws2 = XLSX.utils.aoa_to_sheet([aHdr,...aRows]);
-  ws2['!cols'] = [18,22,...meetingDates.map(()=>({wch:12}))].map(w=>typeof w==='number'?{wch:w}:w);
+  // ── Sheet 1: Time C-Ing (mismo formato que el original)
+  function calcAno(r)     { return r.sopReal ? new Date(r.sopReal+'T12:00:00').getFullYear() : 'Abierto'; }
+  function calcMes(r)     { return r.sopReal ? new Date(r.sopReal+'T12:00:00').toLocaleDateString('es-MX',{month:'short'}) : ''; }
+  function calcSemana(r)  {
+    if (!r.sopReal) return '';
+    const d = new Date(r.sopReal+'T12:00:00');
+    const startOfYear = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+  }
+
+  // Rows 1-9 vacías (como el original), row 10 = headers
+  const ciSheet = [
+    [],[],[],[],[],[],[],[],[],
+    ['Año','Estatus','Sup','Platform','Cell','NP Actual','NPNuevo','Cuenta liberada',
+     'Descripcion del cambio','Comentarios','Issue','Accion Correctiva',
+     'PPAP\nEntregado','PPAP\nAprob','SOP Planeado','SOP\nReal','Mes','Semana'],
+    ...records.map(r => [
+      calcAno(r),
+      r.sopReal ? 'Fecha Real' : 'Fecha Planeada',
+      r.sup, r.platform, r.cell,
+      r.npActual, r.npNuevo, r.cuenta,
+      r.descripcion, r.comentarios,
+      r.issue, r.accionCorr,
+      r.ppapEntregado, r.ppapAprob,
+      r.sopPlaneado, r.sopReal,
+      calcMes(r), calcSemana(r)
+    ])
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(ciSheet);
+  ws1['!cols'] = [8,14,12,11,8,16,16,14,50,35,25,25,13,13,13,13,8,8].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Time C-Ing');
+
+  // ── Sheet 2: Asistencia (formato original: columnas pareadas Nombre | 1/0 por fecha)
+  const attSheet = [];
+  // Row 1-3 vacías
+  attSheet.push([],[],[]);
+  // Row 4: Departamento + "Fecha" repetido por cada reunión
+  attSheet.push([null, 'Departamento', ...meetingDates.flatMap(() => ['Fecha', null])]);
+  // Row 5: fechas
+  attSheet.push([null, null, ...meetingDates.flatMap(d => [d, null])]);
+  // Rows 6+: dept + (nombre, asistencia) por fecha
+  people.forEach(p => {
+    attSheet.push([
+      null,
+      p.dept || '',
+      ...meetingDates.flatMap(d => [
+        p.name,
+        p.attendance?.[d] === 1 ? 1 : p.attendance?.[d] === 0 ? 0 : null
+      ])
+    ]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(attSheet);
+  ws2['!cols'] = [4, 18, ...meetingDates.flatMap(() => [{wch:22},{wch:8}])].map(w=>typeof w==='number'?{wch:w}:w);
   XLSX.utils.book_append_sheet(wb, ws2, 'Asistencia');
 
   XLSX.writeFile(wb, `Time_CI_${new Date().toISOString().split('T')[0]}.xlsx`);
