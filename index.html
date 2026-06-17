@@ -6,7 +6,7 @@
   <title>Time CI – Control de Cambios de Ingeniería</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -474,66 +474,322 @@ async function addPerson() {
   setSyncing(false);
 }
 
-// ── Export to Excel (formato original)
-function exportToExcel() {
-  const wb = XLSX.utils.book_new();
+// ── Helpers
+function calcAno(r)    { return r.sopReal ? new Date(r.sopReal+'T12:00:00').getFullYear() : 'Abierto'; }
+function calcMes(r)    { return r.sopReal ? new Date(r.sopReal+'T12:00:00').toLocaleDateString('es-MX',{month:'short'}) : ''; }
+function calcSemana(r) {
+  if (!r.sopReal) return '';
+  const d = new Date(r.sopReal+'T12:00:00');
+  const start = new Date(d.getFullYear(),0,1);
+  return Math.ceil(((d-start)/86400000+start.getDay()+1)/7);
+}
 
-  // ── Sheet 1: Time C-Ing (mismo formato que el original)
-  function calcAno(r)     { return r.sopReal ? new Date(r.sopReal+'T12:00:00').getFullYear() : 'Abierto'; }
-  function calcMes(r)     { return r.sopReal ? new Date(r.sopReal+'T12:00:00').toLocaleDateString('es-MX',{month:'short'}) : ''; }
-  function calcSemana(r)  {
-    if (!r.sopReal) return '';
-    const d = new Date(r.sopReal+'T12:00:00');
-    const startOfYear = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+// Render a Chart.js chart to a base64 PNG (offscreen, no UI flash)
+function chartToImage(type, data, options={}) {
+  const c = document.createElement('canvas');
+  c.width=700; c.height=380;
+  document.body.appendChild(c);
+  const ch = new Chart(c, {type, data, options:{...options, animation:false, responsive:false}});
+  const img = c.toDataURL('image/png').split(',')[1];
+  ch.destroy(); document.body.removeChild(c);
+  return img;
+}
+
+// ── Export to Excel (con formato, colores y gráficas)
+async function exportToExcel() {
+  const btn = document.querySelector('button[onclick="exportToExcel()"]');
+  btn.textContent = '⏳ Generando...'; btn.disabled = true;
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Arturo Rebolledo'; wb.created = new Date();
+
+    // ── Color palette
+    const C = {
+      blueDark:'FF1e3a8a', blueMed:'FF1e40af', white:'FFFFFFFF',
+      greenBg:'FFdcfce7', greenFg:'FF15803d',
+      redBg:'FFfee2e2',   redFg:'FFb91c1c',
+      blueBg:'FFdbeafe',
+      orangeBg:'FFffedd5', orangeFg:'FFc2410c',
+      gray:'FFf8fafc', gray2:'FFe2e8f0', grayText:'FF6b7280'
+    };
+
+    function hdrCell(cell, val) {
+      cell.value = val;
+      cell.font = {bold:true, color:{argb:C.white}, size:11};
+      cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
+      cell.alignment = {vertical:'middle',horizontal:'center',wrapText:true};
+      cell.border = {bottom:{style:'medium',color:{argb:C.white}}};
+    }
+
+    function statusColors(s) {
+      if (s==='A tiempo')    return {bg:C.greenBg,  fg:C.greenFg};
+      if (s==='Con retraso') return {bg:C.redBg,    fg:C.redFg};
+      if (s==='Vencido')     return {bg:C.orangeBg, fg:C.orangeFg};
+      return {bg:C.blueBg, fg:C.blueMed};
+    }
+
+    // ════════════════════════════════════════════
+    // SHEET 1 — RESUMEN
+    // ════════════════════════════════════════════
+    const sh1 = wb.addWorksheet('Resumen');
+    sh1.columns = Array(10).fill({width:18});
+
+    // Title
+    sh1.mergeCells('A1:J1');
+    Object.assign(sh1.getCell('A1'), {
+      value:'📋 Time CI – Control de Cambios de Ingeniería',
+      font:{bold:true,size:16,color:{argb:C.white}},
+      fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
+      alignment:{horizontal:'center',vertical:'middle'}
+    });
+    sh1.getRow(1).height = 42;
+
+    sh1.mergeCells('A2:J2');
+    Object.assign(sh1.getCell('A2'), {
+      value:`Exportado el ${new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})} · Creado por Arturo Rebolledo`,
+      font:{italic:true,size:10,color:{argb:C.grayText}},
+      alignment:{horizontal:'center'}
+    });
+    sh1.getRow(3).height = 10;
+
+    // KPI boxes
+    const statuses = records.map(getStatus);
+    const kpis = [
+      {label:'TOTAL CAMBIOS',       val:records.length,                                     ...{bg:C.blueBg,    fg:C.blueMed}},
+      {label:'CERRADOS A TIEMPO',   val:statuses.filter(s=>s==='A tiempo').length,           ...{bg:C.greenBg,   fg:C.greenFg}},
+      {label:'CERRADOS CON RETRASO',val:statuses.filter(s=>s==='Con retraso').length,        ...{bg:C.redBg,     fg:C.redFg}},
+      {label:'ABIERTOS / VENCIDOS', val:statuses.filter(s=>s==='Abierto'||s==='Vencido').length, ...{bg:C.orangeBg, fg:C.orangeFg}},
+    ];
+    const kpiCols = [['A','B'],['C','D'],['E','F'],['G','H']];
+    kpis.forEach((k,i) => {
+      const [c1,c2] = kpiCols[i];
+      sh1.mergeCells(`${c1}4:${c2}4`);
+      sh1.mergeCells(`${c1}5:${c2}5`);
+      sh1.mergeCells(`${c1}6:${c2}6`);
+      const pct = records.length>0 ? Math.round(k.val/records.length*100)+'% del total' : '';
+      [[4,k.label,9,true],[5,k.val,32,true],[6,i===0?'100% del total':pct,9,false]].forEach(([row,val,size,bold])=>{
+        const cell = sh1.getCell(`${c1}${row}`);
+        cell.value=val; cell.font={bold,size,color:{argb:k.fg}};
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:k.bg}};
+        cell.alignment={horizontal:'center',vertical:'middle'};
+      });
+      sh1.getRow(4).height=18; sh1.getRow(5).height=48; sh1.getRow(6).height=16;
+    });
+    sh1.getRow(7).height=14;
+
+    // Summary tables side by side
+    const platData = {}; const supData = {};
+    records.forEach(r=>{
+      const p=r.platform||'N/A'; platData[p]=(platData[p]||{t:0,ok:0,late:0});
+      platData[p].t++; if(getStatus(r)==='A tiempo') platData[p].ok++; if(getStatus(r)==='Con retraso') platData[p].late++;
+      const s=r.sup||'N/A'; supData[s]=(supData[s]||{t:0,ok:0,late:0});
+      supData[s].t++; if(getStatus(r)==='A tiempo') supData[s].ok++; if(getStatus(r)==='Con retraso') supData[s].late++;
+    });
+
+    [[platData,'A','Plataforma'],[supData,'F','Supervisor']].forEach(([data,col,label])=>{
+      sh1.mergeCells(`${col}8:${String.fromCharCode(col.charCodeAt(0)+4)}8`);
+      const th = sh1.getCell(`${col}8`);
+      th.value=`CAMBIOS POR ${label.toUpperCase()}`;
+      th.font={bold:true,size:11,color:{argb:C.white}};
+      th.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
+      th.alignment={horizontal:'center'};
+      sh1.getRow(8).height=22;
+
+      const cols2 = [col, String.fromCharCode(col.charCodeAt(0)+1), String.fromCharCode(col.charCodeAt(0)+2), String.fromCharCode(col.charCodeAt(0)+3), String.fromCharCode(col.charCodeAt(0)+4)];
+      [label,'Total','A Tiempo','Con Retraso','%'].forEach((h,i)=>{
+        const c=sh1.getCell(`${cols2[i]}9`);
+        c.value=h; c.font={bold:true,size:10};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.gray2}};
+        c.border={bottom:{style:'thin',color:{argb:C.gray2}}};
+        c.alignment={horizontal:'center'};
+      });
+      sh1.getRow(9).height=18;
+
+      let row=10;
+      Object.entries(data).forEach(([name,d])=>{
+        [name,d.t,d.ok,d.late,Math.round(d.t/records.length*100)+'%'].forEach((v,i)=>{
+          const c=sh1.getCell(`${cols2[i]}${row}`);
+          c.value=v; c.alignment={horizontal:i===0?'left':'center',vertical:'middle'};
+          if(i===2) c.font={color:{argb:C.greenFg}};
+          if(i===3) c.font={color:{argb:C.redFg}};
+          c.fill={type:'pattern',pattern:'solid',fgColor:{argb:row%2===0?C.gray:'FFFFFFFF'}};
+        });
+        row++;
+      });
+    });
+
+    // Embedded chart images
+    const maxTableRow = 10 + Math.max(Object.keys(platData).length, Object.keys(supData).length);
+    const imgStartRow = maxTableRow + 1;
+
+    const platColors = ['FF3b82f6','FF8b5cf6','FFf59e0b','FF10b981'];
+    const platImg = chartToImage('bar',
+      {labels:Object.keys(platData), datasets:[{label:'Cambios',data:Object.values(platData).map(d=>d.t),backgroundColor:Object.keys(platData).map((_,i)=>('#'+platColors[i%4].slice(2))),borderRadius:6}]},
+      {plugins:{legend:{display:false},title:{display:true,text:'Cambios por Plataforma',font:{size:14}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+    );
+    const statusImg = chartToImage('doughnut',
+      {labels:['A tiempo','Con retraso','Abierto','Vencido'],
+       datasets:[{data:[statuses.filter(s=>s==='A tiempo').length,statuses.filter(s=>s==='Con retraso').length,statuses.filter(s=>s==='Abierto').length,statuses.filter(s=>s==='Vencido').length],backgroundColor:['#22c55e','#ef4444','#3b82f6','#f97316'],borderWidth:2}]},
+      {plugins:{legend:{position:'bottom'},title:{display:true,text:'Estatus de Cambios',font:{size:14}}}}
+    );
+
+    const id1 = wb.addImage({base64:platImg,   extension:'png'});
+    const id2 = wb.addImage({base64:statusImg, extension:'png'});
+    sh1.addImage(id1, {tl:{col:0,row:imgStartRow},  ext:{width:500,height:300}});
+    sh1.addImage(id2, {tl:{col:5,row:imgStartRow},  ext:{width:420,height:300}});
+
+    // ════════════════════════════════════════════
+    // SHEET 2 — TIME C-ING
+    // ════════════════════════════════════════════
+    const sh2 = wb.addWorksheet('Time C-Ing');
+    sh2.columns = [
+      {width:10},{width:15},{width:12},{width:11},{width:8},
+      {width:17},{width:17},{width:14},{width:52},{width:36},
+      {width:26},{width:26},{width:13},{width:13},{width:13},{width:13},{width:8},{width:8}
+    ];
+    // Rows 1-9 empty (original format)
+    for(let i=1;i<=9;i++) sh2.getRow(i).height=5;
+
+    // Row 10 headers
+    const CI_HDRS = ['Año','Estatus','Sup','Platform','Cell','NP Actual','NPNuevo',
+      'Cuenta liberada','Descripcion del cambio','Comentarios','Issue','Accion Correctiva',
+      'PPAP\nEntregado','PPAP\nAprob','SOP Planeado','SOP\nReal','Mes','Semana'];
+    const hRow = sh2.getRow(10); hRow.height=36;
+    CI_HDRS.forEach((h,i) => hdrCell(hRow.getCell(i+1), h));
+    sh2.views = [{state:'frozen',ySplit:10}];
+    sh2.autoFilter = {from:{row:10,column:1}, to:{row:10,column:18}};
+
+    records.forEach((r,ri) => {
+      const s = getStatus(r);
+      const sc = statusColors(s);
+      const alt = ri%2===1;
+      const rowBg = alt ? C.gray : 'FFFFFFFF';
+
+      const vals = [
+        calcAno(r), s,
+        r.sup, r.platform, r.cell, r.npActual, r.npNuevo, r.cuenta,
+        r.descripcion, r.comentarios, r.issue, r.accionCorr,
+        r.ppapEntregado, r.ppapAprob, r.sopPlaneado, r.sopReal,
+        calcMes(r), calcSemana(r)
+      ];
+      const dRow = sh2.getRow(11+ri); dRow.height=22;
+      vals.forEach((v,ci) => {
+        const cell = dRow.getCell(ci+1);
+        cell.value = v;
+        cell.alignment = {vertical:'middle', wrapText:ci===8||ci===9||ci===10||ci===11};
+        cell.border = {bottom:{style:'hair',color:{argb:C.gray2}}, right:{style:'hair',color:{argb:C.gray2}}};
+        if (ci<2) {
+          cell.font = {bold:true, color:{argb:sc.fg}};
+          cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:sc.bg}};
+          if(ci===1) cell.alignment.horizontal='center';
+        } else {
+          cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
+          cell.font = {size:10};
+        }
+      });
+    });
+
+    // ════════════════════════════════════════════
+    // SHEET 3 — ASISTENCIA
+    // ════════════════════════════════════════════
+    const sh3 = wb.addWorksheet('Asistencia');
+    sh3.columns = [{width:18},{width:22},...meetingDates.flatMap(()=>[{width:22},{width:7}]),{width:10}];
+
+    // Title
+    const totalCols = 2 + meetingDates.length*2 + 1;
+    sh3.mergeCells(1,1,1,totalCols);
+    Object.assign(sh3.getCell('A1'),{
+      value:'Registro de Asistencia a Reuniones CI',
+      font:{bold:true,size:14,color:{argb:C.white}},
+      fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
+      alignment:{horizontal:'center',vertical:'middle'}
+    });
+    sh3.getRow(1).height=34;
+    sh3.getRow(2).height=8;
+
+    // Row 3: merged date headers
+    const r3 = sh3.getRow(3); r3.height=28;
+    hdrCell(r3.getCell(1),'Departamento');
+    hdrCell(r3.getCell(2),'Persona');
+    meetingDates.forEach((d,i)=>{
+      const col = 3+i*2;
+      sh3.mergeCells(3,col,3,col+1);
+      const dt = new Date(d+'T12:00:00');
+      hdrCell(sh3.getCell(3,col), dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}));
+    });
+    sh3.mergeCells(3,3+meetingDates.length*2,3,3+meetingDates.length*2);
+    hdrCell(sh3.getCell(3,3+meetingDates.length*2),'Total');
+
+    // Row 4: Nombre / P/A subheaders
+    const r4 = sh3.getRow(4); r4.height=16;
+    meetingDates.forEach((_,i)=>{
+      [3+i*2, 3+i*2+1].forEach((col,j)=>{
+        const c=sh3.getCell(4,col);
+        c.value=j===0?'Nombre':'P/A';
+        c.font={bold:true,size:9,color:{argb:C.white}};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF374151'}};
+        c.alignment={horizontal:'center'};
+      });
+    });
+
+    // Data rows
+    people.forEach((p,pi)=>{
+      const dRow = sh3.getRow(5+pi); dRow.height=22;
+      const alt = pi%2===1;
+      const bg = alt ? C.gray : 'FFFFFFFF';
+      const total = meetingDates.filter(d=>p.attendance?.[d]===1).length;
+
+      [p.dept||'', p.name].forEach((v,i)=>{
+        const c=dRow.getCell(i+1);
+        c.value=v; c.font={bold:i===0,size:10};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+        c.alignment={vertical:'middle'};
+      });
+
+      meetingDates.forEach((d,i)=>{
+        const nameC = dRow.getCell(3+i*2);
+        nameC.value=p.name; nameC.font={size:9,color:{argb:C.grayText}};
+        nameC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+        nameC.alignment={vertical:'middle'};
+
+        const v = p.attendance?.[d];
+        const attC = dRow.getCell(3+i*2+1);
+        attC.alignment={horizontal:'center',vertical:'middle'};
+        if(v===1){
+          attC.value='✓'; attC.font={bold:true,color:{argb:C.greenFg},size:13};
+          attC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.greenBg}};
+        } else if(v===0){
+          attC.value='✗'; attC.font={bold:true,color:{argb:C.redFg},size:13};
+          attC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.redBg}};
+        } else {
+          attC.value='–'; attC.font={color:{argb:C.grayText}};
+          attC.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFf3f4f6'}};
+        }
+      });
+
+      const totC = dRow.getCell(3+meetingDates.length*2);
+      totC.value=`${total}/${meetingDates.length}`;
+      totC.font={bold:true,color:{argb:C.blueMed}};
+      totC.alignment={horizontal:'center',vertical:'middle'};
+      totC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+    });
+
+    // ── Download
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=`Time_CI_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  } catch(err) {
+    alert('Error al exportar: '+err.message);
+    console.error(err);
+  } finally {
+    btn.textContent='⬇️ Exportar a Excel'; btn.disabled=false;
   }
-
-  // Rows 1-9 vacías (como el original), row 10 = headers
-  const ciSheet = [
-    [],[],[],[],[],[],[],[],[],
-    ['Año','Estatus','Sup','Platform','Cell','NP Actual','NPNuevo','Cuenta liberada',
-     'Descripcion del cambio','Comentarios','Issue','Accion Correctiva',
-     'PPAP\nEntregado','PPAP\nAprob','SOP Planeado','SOP\nReal','Mes','Semana'],
-    ...records.map(r => [
-      calcAno(r),
-      r.sopReal ? 'Fecha Real' : 'Fecha Planeada',
-      r.sup, r.platform, r.cell,
-      r.npActual, r.npNuevo, r.cuenta,
-      r.descripcion, r.comentarios,
-      r.issue, r.accionCorr,
-      r.ppapEntregado, r.ppapAprob,
-      r.sopPlaneado, r.sopReal,
-      calcMes(r), calcSemana(r)
-    ])
-  ];
-  const ws1 = XLSX.utils.aoa_to_sheet(ciSheet);
-  ws1['!cols'] = [8,14,12,11,8,16,16,14,50,35,25,25,13,13,13,13,8,8].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws1, 'Time C-Ing');
-
-  // ── Sheet 2: Asistencia (formato original: columnas pareadas Nombre | 1/0 por fecha)
-  const attSheet = [];
-  // Row 1-3 vacías
-  attSheet.push([],[],[]);
-  // Row 4: Departamento + "Fecha" repetido por cada reunión
-  attSheet.push([null, 'Departamento', ...meetingDates.flatMap(() => ['Fecha', null])]);
-  // Row 5: fechas
-  attSheet.push([null, null, ...meetingDates.flatMap(d => [d, null])]);
-  // Rows 6+: dept + (nombre, asistencia) por fecha
-  people.forEach(p => {
-    attSheet.push([
-      null,
-      p.dept || '',
-      ...meetingDates.flatMap(d => [
-        p.name,
-        p.attendance?.[d] === 1 ? 1 : p.attendance?.[d] === 0 ? 0 : null
-      ])
-    ]);
-  });
-  const ws2 = XLSX.utils.aoa_to_sheet(attSheet);
-  ws2['!cols'] = [4, 18, ...meetingDates.flatMap(() => [{wch:22},{wch:8}])].map(w=>typeof w==='number'?{wch:w}:w);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Asistencia');
-
-  XLSX.writeFile(wb, `Time_CI_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 // ── First-time data upload
