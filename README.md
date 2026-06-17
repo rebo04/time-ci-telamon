@@ -1,6 +1,6 @@
 # Time CI – Control de Cambios de Ingeniería
 
-App web para gestionar los cambios de ingeniería (CI) del equipo de Telamon de México. Reemplaza el archivo Excel `.xlsm` con una interfaz moderna, colaborativa y en tiempo real.
+App web para gestionar los cambios de ingeniería (CI) del equipo de Telamon. Reemplaza el archivo Excel `.xlsm` con una interfaz moderna, colaborativa y en tiempo real.
 
 **Creado por Arturo Rebolledo**
 
