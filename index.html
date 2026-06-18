@@ -840,14 +840,29 @@ async function exportToExcel() {
   }
 }
 
-// ── First-time data upload
+// ── Seed version — bump to force a full reset from INITIAL
+const SEED_VERSION = 2;
+
+// ── First-time (or version-mismatch) data upload
 async function uploadInitialData() {
-  document.getElementById('loading-msg').textContent = 'Primera vez: cargando datos iniciales…';
+  document.getElementById('loading-msg').textContent = 'Sincronizando datos con Excel…';
+
+  // Delete all existing records and people first
+  const [recSnap, peopleSnap] = await Promise.all([
+    db.collection('records').get(),
+    db.collection('people').get()
+  ]);
+  const delBatch = db.batch();
+  recSnap.docs.forEach(d => delBatch.delete(d.ref));
+  peopleSnap.docs.forEach(d => delBatch.delete(d.ref));
+  if (recSnap.docs.length + peopleSnap.docs.length > 0) await delBatch.commit();
+
+  // Upload fresh data from INITIAL
   const BATCH_SIZE = 490;
   const allOps = [
     ...INITIAL.records.map(r => ({ col:'records', id:String(r.id), data:r })),
     ...INITIAL.people.map((p,i) => ({ col:'people', id:String(i), data:{...p} })),
-    { col:'config', id:'meetingDates', data:{dates:INITIAL.meetingDates} }
+    { col:'config', id:'meetingDates', data:{dates:INITIAL.meetingDates, seedVersion:SEED_VERSION} }
   ];
   for (let i=0; i<allOps.length; i+=BATCH_SIZE) {
     const batch = db.batch();
@@ -879,9 +894,9 @@ function initListeners() {
 // ── Init
 async function init() {
   try {
-    // Check if DB is empty
+    // Seed if DB is empty or on version mismatch
     const check = await db.collection('config').doc('meetingDates').get();
-    if (!check.exists) await uploadInitialData();
+    if (!check.exists || (check.data().seedVersion || 1) !== SEED_VERSION) await uploadInitialData();
 
     initListeners();
 
