@@ -688,7 +688,8 @@ const CHART1_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>
 <c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
 <c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/></c:valAx>
-</c:plotArea><c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;
+</c:plotArea><c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart>
+<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
 const CHART2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
 <c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Estatus de Cambios</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
@@ -701,7 +702,8 @@ const CHART2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:cat><c:strRef><c:f>&apos;Resumen&apos;!$D$9:$D$12</c:f></c:strRef></c:cat>
 <c:val><c:numRef><c:f>&apos;Resumen&apos;!$E$9:$E$12</c:f></c:numRef></c:val>
 </c:ser></c:pieChart></c:plotArea>
-<c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;
+<c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart>
+<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
 const DRAWING1_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
 <xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>16</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>30</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="1" name="Chart 1"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
@@ -752,7 +754,7 @@ async function exportToExcel() {
     // Cells D9:E13 = estatus (pie chart data)
     // ════════════════════════════════════════════
     const sh1 = wb.addWorksheet('Resumen');
-    // Only define widths for columns actually used (A–H). Nothing beyond H lives here.
+    sh1.views = [{ showGridLines: false }];
     sh1.columns = [
       {width:18},{width:10},{width:18},{width:10},
       {width:18},{width:10},{width:18},{width:10}
