@@ -11,9 +11,15 @@ App web para gestionar los cambios de ingeniería (CI) del equipo de Telamon. Re
 ## ¿Qué hace?
 
 - **Resumen (Dashboard):** KPIs de cambios totales, cerrados a tiempo, con retraso y abiertos. Gráficas por plataforma y estatus.
-- **Cambios CI:** Tabla completa con los 83 registros migrados del Excel. Filtros por supervisor, plataforma y estatus. Agregar, editar y eliminar registros.
+- **Cambios CI:** Tabla completa con todos los registros migrados del Excel. Todos los campos visibles: NP Actual/Nuevo, Descripción, Comentarios, Issue, Acción Correctiva, PPAP Entregado, PPAP Aprobado, SOP Planeado/Real, Mes, Semana y Estatus. Filtros por supervisor, plataforma y estatus. Agregar, editar y eliminar registros.
+- **Color coding:** Filas coloreadas igual que en el Excel original — verde (SOP en fecha), rojo (SOP fuera de fecha / Vencido), amarillo (PPAP aprobado, SOP pendiente). Leyenda visible en la tabla.
 - **Asistencia:** Registro de asistencia a reuniones CI por departamento. Toggle de presencia/ausencia con un clic.
-- **Exportar a Excel:** Descarga un `.xlsx` limpio con dos hojas (Cambios CI + Asistencia) con los datos actuales.
+- **Exportar a Excel:** Descarga un `.xlsx` con 4 hojas:
+  - **Resumen** — dashboard con KPIs y 2 gráficas (plataforma y estatus), sin cuadrículas ni bordes
+  - **Time C-Ing** — todos los registros con todos los campos
+  - **CI Con Estado** — solo las filas con color (verde/rojo/amarillo), con fondo coloreado
+  - **Asistencia** — registro de asistencia completo
+  - **Graficas** — gráficas de cambios por Mes, Semana y Año
 - **Tiempo real:** Todos los usuarios ven los cambios al instante gracias a Firebase Firestore.
 
 ---
@@ -25,7 +31,8 @@ App web para gestionar los cambios de ingeniería (CI) del equipo de Telamon. Re
 | HTML + Vanilla JS | App completa en un solo archivo `index.html` |
 | Tailwind CSS (CDN) | Estilos |
 | Chart.js (CDN) | Gráficas del dashboard |
-| SheetJS / xlsx (CDN) | Exportar a Excel |
+| ExcelJS (CDN) | Construcción del workbook Excel |
+| JSZip (CDN) | Inyección de gráficas reales en el `.xlsx` |
 | Firebase Firestore | Base de datos en tiempo real compartida |
 | GitHub Pages | Hosting gratuito |
 
@@ -45,16 +52,14 @@ config/
 ## Cómo actualizar el HTML y publicar
 
 ```bash
-cd ~/Downloads/time-ci-telamon
+cd ~/time-ci-telamon
 
-# Copia el HTML actualizado
-cp '../Time CI App.html' index.html
-
-# Sube a GitHub (GitHub Pages se actualiza automáticamente)
 git add index.html
 git commit -m "descripción del cambio"
 git push
 ```
+
+GitHub Actions despliega automáticamente a GitHub Pages en ~1 minuto.
 
 ---
 
@@ -89,7 +94,7 @@ service cloud.firestore {
 
 ## Primera carga
 
-La primera vez que alguien abre la app en un Firestore vacío, el sistema sube automáticamente los 83 registros originales del Excel + los datos de asistencia. No se necesita hacer nada manualmente.
+La primera vez que alguien abre la app en un Firestore vacío, el sistema sube automáticamente los registros originales del Excel + los datos de asistencia. No se necesita hacer nada manualmente.
 
 ---
 
