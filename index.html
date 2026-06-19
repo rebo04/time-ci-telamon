@@ -682,13 +682,14 @@ const CHART1_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Cambios por Plataforma</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
 <c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>
 <c:ser><c:idx val="0"/><c:order val="0"/>
+<c:tx><c:strRef><c:f>&apos;Resumen&apos;!$B$8</c:f></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="3b82f6"/></a:solidFill></c:spPr>
 <c:cat><c:strRef><c:f>&apos;Resumen&apos;!$A$9:$A$13</c:f></c:strRef></c:cat>
 <c:val><c:numRef><c:f>&apos;Resumen&apos;!$B$9:$B$13</c:f></c:numRef></c:val>
 </c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>
 <c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
 <c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/></c:valAx>
-</c:plotArea><c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart>
+</c:plotArea><c:plotVisOnly val="1"/></c:chart>
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
 const CHART2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
@@ -706,8 +707,8 @@ const CHART2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
 const DRAWING1_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
-<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>16</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>30</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="1" name="Chart 1"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
-<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>16</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>9</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>30</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="Chart 2"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId2"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
+<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>14</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>29</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="1" name="Chart 1"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
+<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>14</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>9</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>29</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="Chart 2"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId2"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
 </xdr:wsDr>`;
 const DRAWING1_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -837,8 +838,8 @@ async function exportToExcel() {
 
     // ════════════════════════════════════════════
     // PERIOD DATA TABLES (for chart3/4/5)
-    //   Las gráficas 1/2 ocupan rows 16–30, así que estas tablas
-    //   se escriben debajo (título row 31, encabezado row 32, datos row 33+).
+    //   Las gráficas 1/2 ocupan rows 15–30, así que estas tablas
+    //   se escriben debajo (título row 32, encabezado row 33, datos row 34+).
     //   Mes:    col A/B  → chart3
     //   Semana: col D/E  → chart4
     //   Año:    col G/H  → chart5
@@ -847,7 +848,7 @@ async function exportToExcel() {
     const weekData  = buildWeekData(records);
     const yearData  = buildYearData(records);
 
-    const PERIOD_TITLE_ROW = 31, PERIOD_HDR_ROW = 32, PERIOD_DATA_ROW = 33;
+    const PERIOD_TITLE_ROW = 32, PERIOD_HDR_ROW = 33, PERIOD_DATA_ROW = 34;
 
     // helper: writes a small "título + tabla" block and returns last data row (1-based)
     function writeperiodTable(titleCol, titleText, headerLabels, pd, maxRows) {
@@ -902,13 +903,14 @@ async function exportToExcel() {
 <c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
 <c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>
 <c:ser><c:idx val="0"/><c:order val="0"/>
+<c:tx><c:v>${title}</c:v></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr>
 <c:cat><c:strRef><c:f>${catRef}</c:f></c:strRef></c:cat>
 <c:val><c:numRef><c:f>${valRef}</c:f></c:numRef></c:val>
 </c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>
 <c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
 <c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/></c:valAx>
-</c:plotArea><c:legend><c:legendPos val="b"/></c:legend><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;
+</c:plotArea><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;
 
     const CHART3_XML = periodBarXml('Cambios por Mes',    mesCatRef, mesValRef, '6366f1');
     const CHART4_XML = periodBarXml('Cambios por Semana', semCatRef, semValRef, '8b5cf6');
@@ -1051,15 +1053,15 @@ async function exportToExcel() {
     const excelBuffer = await wb.xlsx.writeBuffer();
     const excelZip = await JSZip.loadAsync(excelBuffer);
 
-    // ── Drawing XML: 2 gráficas existentes (rows 16–30) + 3 de período.
-    // Las tablas de período viven en rows 31–~56, así que estas gráficas se
-    // colocan debajo (rows 58+), escalonadas lado a lado para que no se traslapen.
+    // ── Drawing XML: 2 gráficas existentes (rows 15–30) + 3 de período.
+    // Las tablas de período viven en rows 32–57 (máx), así que estas gráficas se
+    // colocan debajo (rows 59+), escalonadas lado a lado para que no se traslapen.
     const periodAnchor = (col0, col1, row0, row1, id, rid) =>
 `<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
     const drawingXml = DRAWING1_XML.replace('</xdr:wsDr>',
-      periodAnchor(0,4,58,74,3,'rId3') +   // Mes    (cols A–D, rows 58–74)
-      periodAnchor(4,8,58,74,4,'rId4') +   // Semana (cols E–H, rows 58–74)
-      periodAnchor(0,4,75,91,5,'rId5') +   // Año    (cols A–D, rows 75–91)
+      periodAnchor(0,4,59,74,3,'rId3') +   // Mes    (cols A–D, rows 59–74)
+      periodAnchor(4,8,59,74,4,'rId4') +   // Semana (cols E–H, rows 59–74)
+      periodAnchor(0,4,76,91,5,'rId5') +   // Año    (cols A–D, rows 76–91)
       '</xdr:wsDr>');
     const drawingRels = DRAWING1_RELS.replace('</Relationships>',
       '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart3.xml"/>' +
