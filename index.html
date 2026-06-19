@@ -62,20 +62,20 @@
 <div class="bg-blue-900 text-white shadow-xl">
   <div style="max-width:1400px;margin:auto;padding:16px 24px;" class="flex items-center justify-between">
     <div>
-      <h1 style="font-size:22px;font-weight:800;letter-spacing:-.3px;">📋 Time CI – Control de Cambios de Ingeniería</h1>
+      <h1 style="font-size:22px;font-weight:800;letter-spacing:-.3px;">Time CI – Control de Cambios de Ingeniería</h1>
       <p style="color:#93c5fd;font-size:13px;margin-top:2px;">
         <span id="sync-dot"></span><span id="sync-label">Sincronizado</span>
         &nbsp;·&nbsp; Creado por Arturo Rebolledo
       </p>
     </div>
     <button onclick="exportToExcel()" style="background:#16a34a;color:white;padding:10px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;">
-      ⬇️ Exportar a Excel
+      Exportar a Excel
     </button>
   </div>
   <div style="max-width:1400px;margin:auto;padding:0 24px;display:flex;gap:4px;">
-    <button class="tab-btn active" id="tab-dashboard" onclick="showTab('dashboard')">📊 Resumen</button>
-    <button class="tab-btn" id="tab-ci" onclick="showTab('ci')">📋 Cambios CI</button>
-    <button class="tab-btn" id="tab-asistencia" onclick="showTab('asistencia')">👥 Asistencia</button>
+    <button class="tab-btn active" id="tab-dashboard" onclick="showTab('dashboard')">Resumen</button>
+    <button class="tab-btn" id="tab-ci" onclick="showTab('ci')">Cambios CI</button>
+    <button class="tab-btn" id="tab-asistencia" onclick="showTab('asistencia')">Asistencia</button>
   </div>
 </div>
 
@@ -86,7 +86,7 @@
 
     <!-- Filter bar -->
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
-      <span style="font-weight:700;color:#1e3a8a;font-size:14px;">🔍 Filtrar Resumen:</span>
+      <span style="font-weight:700;color:#1e3a8a;font-size:14px;">Filtrar Resumen:</span>
       <div style="min-width:200px;">
         <label>Plataforma / Cliente</label>
         <select id="dash-platform" onchange="renderDashboard()">
@@ -231,7 +231,7 @@
         <tbody id="att-body"></tbody>
       </table>
     </div>
-    <p style="font-size:13px;color:#9ca3af;margin-top:10px;text-align:center;">Haz clic en ✅ o ❌ para cambiar la asistencia · Los cambios se guardan automáticamente para todos</p>
+    <p style="font-size:13px;color:#9ca3af;margin-top:10px;text-align:center;">Haz clic para cambiar la asistencia · Los cambios se guardan automáticamente para todos</p>
   </div>
 </div>
 
@@ -276,7 +276,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════
-// 🔥 FIREBASE CONFIG — pega aquí tu configuración
+// FIREBASE CONFIG — pega aquí tu configuración
 // ═══════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyB2oXykkLhdPsqVZzD9RE1Hf3wFjHMXRyw",
@@ -540,8 +540,8 @@ function renderTable() {
       <td style="padding:10px;${R}font-size:12px;text-align:center;">${sem}</td>
       <td style="padding:10px;${R}">${badge(s)}</td>
       <td style="padding:10px;${R}white-space:nowrap;">
-        <button onclick="openModal(${r.id})" class="btn-e">✏️ Editar</button>&nbsp;
-        <button onclick="deleteRecord(${r.id})" class="btn-d">🗑️</button>
+        <button onclick="openModal(${r.id})" class="btn-e">Editar</button>&nbsp;
+        <button onclick="deleteRecord(${r.id})" class="btn-d">Eliminar</button>
       </td>
     </tr>`;
   }).join('');
@@ -616,8 +616,8 @@ function renderAttendance() {
       <td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:160px;background:${bg};z-index:1;">${p.name}</td>
       ${meetingDates.map(d => {
         const v = p.attendance?.[d];
-        if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes" onclick="toggleAtt('${p._docId}','${d}',${pi})">✅</div></td>`;
-        if (v===0) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-no" onclick="toggleAtt('${p._docId}','${d}',${pi})">❌</div></td>`;
+        if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes" onclick="toggleAtt('${p._docId}','${d}',${pi})">&#10003;</div></td>`;
+        if (v===0) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-no" onclick="toggleAtt('${p._docId}','${d}',${pi})">&#10007;</div></td>`;
         return `<td style="padding:6px;text-align:center;"><div class="att-cell att-na" onclick="toggleAtt('${p._docId}','${d}',${pi})">–</div></td>`;
       }).join('')}
       <td style="padding:10px 8px;text-align:center;font-weight:700;color:#1e40af;">${total}/${meetingDates.length}</td>
@@ -1192,7 +1192,7 @@ ${mkAnchor(0,4,50,68,3,'rId3')}
     alert('Error al exportar: '+err.message);
     console.error(err);
   } finally {
-    btn.textContent='⬇️ Exportar a Excel'; btn.disabled=false;
+    btn.textContent='Exportar a Excel'; btn.disabled=false;
   }
 }
 
@@ -1267,7 +1267,7 @@ async function init() {
     showTab('dashboard');
   } catch(err) {
     document.getElementById('loading-msg').innerHTML =
-      `<span style="color:#b91c1c;">❌ Error de conexión: ${err.message}</span><br>
+      `<span style="color:#b91c1c;">Error de conexión: ${err.message}</span><br>
        <small style="color:#6b7280;">Verifica el Firebase config arriba en el código</small>`;
   }
 }
