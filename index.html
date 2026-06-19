@@ -837,84 +837,96 @@ async function exportToExcel() {
     sh1.getRow(8).height=20;
 
     // ════════════════════════════════════════════
-    // PERIOD DATA TABLES (for chart3/4/5)
-    //   Las gráficas 1/2 ocupan rows 15–30, así que estas tablas
-    //   se escriben debajo (título row 32, encabezado row 33, datos row 34+).
-    //   Mes:    col A/B  → chart3
-    //   Semana: col D/E  → chart4
-    //   Año:    col G/H  → chart5
+    // SHEET 4 — GRAFICAS (period charts on their own sheet)
     // ════════════════════════════════════════════
-    const monthData = buildMonthData(records);   // {labels:[], data:[]}
+    const sh4 = wb.addWorksheet('Graficas');
+    sh4.views = [{ showGridLines: false }];
+    sh4.columns = [
+      {width:18},{width:10},{width:4},{width:18},{width:10},{width:4},{width:14},{width:10}
+    ];
+    sh4.mergeCells('A1:H1');
+    Object.assign(sh4.getCell('A1'), {
+      value:'Cambios por Período',
+      font:{bold:true,size:14,color:{argb:C.white}},
+      fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
+      alignment:{horizontal:'center',vertical:'middle'}
+    });
+    sh4.getRow(1).height=36; sh4.getRow(2).height=8;
+
+    const monthData = buildMonthData(records);
     const weekData  = buildWeekData(records);
     const yearData  = buildYearData(records);
 
-    const PERIOD_TITLE_ROW = 32, PERIOD_HDR_ROW = 33, PERIOD_DATA_ROW = 34;
-
-    // helper: writes a small "título + tabla" block and returns last data row (1-based)
-    function writeperiodTable(titleCol, titleText, headerLabels, pd, maxRows) {
-      // título (merged across the 2 table columns)
-      sh1.mergeCells(PERIOD_TITLE_ROW, titleCol, PERIOD_TITLE_ROW, titleCol+1);
-      const tCell = sh1.getCell(PERIOD_TITLE_ROW, titleCol);
-      tCell.value = titleText;
-      tCell.font = {bold:true,size:11,color:{argb:C.white}};
-      tCell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
-      tCell.alignment = {horizontal:'center',vertical:'middle'};
-      // encabezados de tabla
-      [headerLabels[0],headerLabels[1]].forEach((h,i)=>{
-        const c = sh1.getCell(PERIOD_HDR_ROW, titleCol+i);
+    const G_DATA_START = 5; // title=3, header=4, data starts at 5
+    function writePeriodTable4(col, titleText, hdrLabels, pd) {
+      const n = Math.min(pd.labels.length, 24);
+      sh4.mergeCells(3, col, 3, col+1);
+      const tC = sh4.getCell(3, col);
+      tC.value=titleText; tC.font={bold:true,size:11,color:{argb:C.white}};
+      tC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
+      tC.alignment={horizontal:'center',vertical:'middle'};
+      [hdrLabels[0],hdrLabels[1]].forEach((h,i)=>{
+        const c=sh4.getCell(4,col+i);
         c.value=h; c.font={bold:true,color:{argb:C.white},size:10};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
         c.alignment={horizontal:'center',vertical:'middle'};
       });
-      // datos
-      const n = Math.min(pd.labels.length, maxRows);
-      for (let i=0;i<n;i++){
-        const lblC = sh1.getCell(PERIOD_DATA_ROW+i, titleCol);
-        const valC = sh1.getCell(PERIOD_DATA_ROW+i, titleCol+1);
-        lblC.value = pd.labels[i];
-        valC.value = pd.data[i];
-        const bg = i%2===0 ? C.gray : 'FFFFFFFF';
-        lblC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-        valC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-        valC.alignment={horizontal:'center'};
+      for(let i=0;i<n;i++){
+        const lC=sh4.getCell(G_DATA_START+i,col), vC=sh4.getCell(G_DATA_START+i,col+1);
+        lC.value=pd.labels[i]; vC.value=pd.data[i];
+        const bg=i%2===0?C.gray:'FFFFFFFF';
+        lC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+        vC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+        vC.alignment={horizontal:'center'};
       }
-      return PERIOD_DATA_ROW + n - 1; // última fila con datos (1-based)
+      sh4.getRow(3).height=20; sh4.getRow(4).height=18;
+      return G_DATA_START+n-1; // last data row
     }
+    const lastMesRowG  = writePeriodTable4(1,'Cambios por Mes',    ['Mes','Total'],    monthData);
+    const lastSemRowG  = writePeriodTable4(4,'Cambios por Semana', ['Semana','Total'], weekData);
+    const lastAnoRowG  = writePeriodTable4(7,'Cambios por Año',    ['Año','Total'],    yearData);
 
-    // Mes  → cols A(1)/B(2)
-    const lastMesRow = writeperiodTable(1, 'Cambios por Mes',    ['Mes','Total'],    monthData, 24);
-    // Semana → cols D(4)/E(5)
-    const lastSemRow = writeperiodTable(4, 'Cambios por Semana', ['Semana','Total'], weekData,  24);
-    // Año  → cols G(7)/H(8)
-    const lastAnoRow = writeperiodTable(7, 'Cambios por Año',    ['Año','Total'],    yearData,  24);
-    sh1.getRow(PERIOD_TITLE_ROW).height=20; sh1.getRow(PERIOD_HDR_ROW).height=18;
-
-    // Rangos de celdas (1-based) para las 3 gráficas de período
-    const mesCatRef = `&apos;Resumen&apos;!$A$${PERIOD_DATA_ROW}:$A$${lastMesRow}`;
-    const mesValRef = `&apos;Resumen&apos;!$B$${PERIOD_DATA_ROW}:$B$${lastMesRow}`;
-    const semCatRef = `&apos;Resumen&apos;!$D$${PERIOD_DATA_ROW}:$D$${lastSemRow}`;
-    const semValRef = `&apos;Resumen&apos;!$E$${PERIOD_DATA_ROW}:$E$${lastSemRow}`;
-    const anoCatRef = `&apos;Resumen&apos;!$G$${PERIOD_DATA_ROW}:$G$${lastAnoRow}`;
-    const anoValRef = `&apos;Resumen&apos;!$H$${PERIOD_DATA_ROW}:$H$${lastAnoRow}`;
-
-    // XML de las gráficas de período (mismo esquema que CHART1_XML)
+    // Period chart XML (reference Graficas sheet cells)
     const periodBarXml = (title, catRef, valRef, color) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
 <c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
 <c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>
 <c:ser><c:idx val="0"/><c:order val="0"/>
-<c:tx><c:v>${title}</c:v></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr>
 <c:cat><c:strRef><c:f>${catRef}</c:f></c:strRef></c:cat>
 <c:val><c:numRef><c:f>${valRef}</c:f></c:numRef></c:val>
 </c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>
 <c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
 <c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/></c:valAx>
-</c:plotArea><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;
+</c:plotArea><c:plotVisOnly val="1"/></c:chart>
+<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
 
-    const CHART3_XML = periodBarXml('Cambios por Mes',    mesCatRef, mesValRef, '6366f1');
-    const CHART4_XML = periodBarXml('Cambios por Semana', semCatRef, semValRef, '8b5cf6');
-    const CHART5_XML = periodBarXml('Cambios por Año',    anoCatRef, anoValRef, '22c55e');
+    const CHART3_XML = periodBarXml('Cambios por Mes',
+      `&apos;Graficas&apos;!$A$${G_DATA_START}:$A$${lastMesRowG}`,
+      `&apos;Graficas&apos;!$B$${G_DATA_START}:$B$${lastMesRowG}`, '6366f1');
+    const CHART4_XML = periodBarXml('Cambios por Semana',
+      `&apos;Graficas&apos;!$D$${G_DATA_START}:$D$${lastSemRowG}`,
+      `&apos;Graficas&apos;!$E$${G_DATA_START}:$E$${lastSemRowG}`, '8b5cf6');
+    const CHART5_XML = periodBarXml('Cambios por Año',
+      `&apos;Graficas&apos;!$G$${G_DATA_START}:$G$${lastAnoRowG}`,
+      `&apos;Graficas&apos;!$H$${G_DATA_START}:$H$${lastAnoRowG}`, '22c55e');
+
+    // Drawing2: charts on Graficas sheet — placed BELOW the data tables
+    // Tables end at max row 28 (5 + 24 - 1). Charts start at drawing row 30 (=Excel row 31).
+    const mkAnchor = (col0,col1,row0,row1,id,rid) =>
+`<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
+    const DRAWING2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+${mkAnchor(0,4,30,48,1,'rId1')}
+${mkAnchor(4,8,30,48,2,'rId2')}
+${mkAnchor(0,4,50,68,3,'rId3')}
+</xdr:wsDr>`;
+    const DRAWING2_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart3.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart4.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart5.xml"/>
+</Relationships>`;
 
     // ════════════════════════════════════════════
     // SHEET 2 — TIME C-ING
@@ -1053,64 +1065,51 @@ async function exportToExcel() {
     const excelBuffer = await wb.xlsx.writeBuffer();
     const excelZip = await JSZip.loadAsync(excelBuffer);
 
-    // ── Drawing XML: 2 gráficas existentes (rows 15–30) + 3 de período.
-    // Las tablas de período viven en rows 32–57 (máx), así que estas gráficas se
-    // colocan debajo (rows 59+), escalonadas lado a lado para que no se traslapen.
-    const periodAnchor = (col0, col1, row0, row1, id, rid) =>
-`<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
-    const drawingXml = DRAWING1_XML.replace('</xdr:wsDr>',
-      periodAnchor(0,4,59,74,3,'rId3') +   // Mes    (cols A–D, rows 59–74)
-      periodAnchor(4,8,59,74,4,'rId4') +   // Semana (cols E–H, rows 59–74)
-      periodAnchor(0,4,76,91,5,'rId5') +   // Año    (cols A–D, rows 76–91)
-      '</xdr:wsDr>');
-    const drawingRels = DRAWING1_RELS.replace('</Relationships>',
-      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart3.xml"/>' +
-      '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart4.xml"/>' +
-      '<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart5.xml"/>' +
-      '</Relationships>');
-
-    // Add chart and drawing XML files directly (no template needed)
+    // ── Inject chart/drawing files
     excelZip.file('xl/charts/chart1.xml', CHART1_XML);
     excelZip.file('xl/charts/chart2.xml', CHART2_XML);
     excelZip.file('xl/charts/chart3.xml', CHART3_XML);
     excelZip.file('xl/charts/chart4.xml', CHART4_XML);
     excelZip.file('xl/charts/chart5.xml', CHART5_XML);
-    excelZip.file('xl/drawings/drawing1.xml', drawingXml);
-    excelZip.file('xl/drawings/_rels/drawing1.xml.rels', drawingRels);
+    excelZip.file('xl/drawings/drawing1.xml', DRAWING1_XML);
+    excelZip.file('xl/drawings/_rels/drawing1.xml.rels', DRAWING1_RELS);
+    excelZip.file('xl/drawings/drawing2.xml', DRAWING2_XML);
+    excelZip.file('xl/drawings/_rels/drawing2.xml.rels', DRAWING2_RELS);
 
-    // Find which sheet file maps to "Resumen" (handle both absolute and relative Target paths)
-    const wbXml  = await excelZip.file('xl/workbook.xml').async('string');
-    const wbRels = await excelZip.file('xl/_rels/workbook.xml.rels').async('string');
-    const rIdMatch = wbXml.match(/name="Resumen"[^>]*r:id="([^"]+)"/);
-    const rId = rIdMatch ? rIdMatch[1] : 'rId1';
-    const tgtMatch = wbRels.match(new RegExp(`Id="${rId}"[^>]*Target="([^"]+)"`));
-    const rawTarget = tgtMatch ? tgtMatch[1] : '/xl/worksheets/sheet1.xml';
-    const sheetFile = rawTarget.startsWith('/') ? rawTarget.slice(1) : `xl/${rawTarget}`;
-    const sheetRels = sheetFile.replace('xl/worksheets/', 'xl/worksheets/_rels/') + '.rels';
+    // ── Helper: patch a sheet to add a drawing reference
+    async function patchSheetDrawing(sheetName, drawingPath, drawingRelId) {
+      const wbXml  = await excelZip.file('xl/workbook.xml').async('string');
+      const wbRels = await excelZip.file('xl/_rels/workbook.xml.rels').async('string');
+      const rIdM = wbXml.match(new RegExp(`name="${sheetName}"[^>]*r:id="([^"]+)"`));
+      const rId  = rIdM ? rIdM[1] : null; if (!rId) return;
+      const tgtM = wbRels.match(new RegExp(`Id="${rId}"[^>]*Target="([^"]+)"`));
+      const rawT = tgtM ? tgtM[1] : null; if (!rawT) return;
+      const sf   = rawT.startsWith('/') ? rawT.slice(1) : `xl/${rawT}`;
+      const sr   = sf.replace('xl/worksheets/', 'xl/worksheets/_rels/') + '.rels';
 
-    // Add drawing reference to Resumen sheet XML
-    let shXml = await excelZip.file(sheetFile).async('string');
-    if (!shXml.includes('xmlns:r=')) {
-      shXml = shXml.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+      let shXml = await excelZip.file(sf).async('string');
+      if (!shXml.includes('xmlns:r='))
+        shXml = shXml.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+      if (!shXml.includes(`r:id="${drawingRelId}"`))
+        shXml = shXml.replace('</worksheet>', `<drawing r:id="${drawingRelId}"/></worksheet>`);
+      excelZip.file(sf, shXml);
+
+      const exR = excelZip.file(sr);
+      let rXml = exR ? await exR.async('string') : '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+      const rel = `<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="/xl/${drawingPath}" Id="${drawingRelId}"/>`;
+      if (!rXml.includes(drawingPath))
+        rXml = rXml.replace('</Relationships>', rel + '</Relationships>');
+      excelZip.file(sr, rXml);
     }
-    if (!shXml.includes('<drawing ')) {
-      shXml = shXml.replace('</worksheet>', '<drawing r:id="rId_draw"/></worksheet>');
-    }
-    excelZip.file(sheetFile, shXml);
 
-    // Update / create the sheet _rels file
-    const existingRels = excelZip.file(sheetRels);
-    let relsXml = existingRels ? await existingRels.async('string') : '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
-    const drawRel = '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="/xl/drawings/drawing1.xml" Id="rId_draw"/>';
-    if (!relsXml.includes('drawing1.xml')) {
-      relsXml = relsXml.replace('</Relationships>', drawRel + '</Relationships>');
-    }
-    excelZip.file(sheetRels, relsXml);
+    await patchSheetDrawing('Resumen',  'drawings/drawing1.xml', 'rId_draw1');
+    await patchSheetDrawing('Graficas', 'drawings/drawing2.xml', 'rId_draw2');
 
-    // Patch Content_Types.xml so Excel recognises the chart/drawing parts
+    // ── Content_Types
     let ctXml = await excelZip.file('[Content_Types].xml').async('string');
     const extraTypes = [
       '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>',
+      '<Override PartName="/xl/drawings/drawing2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>',
       '<Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Override PartName="/xl/charts/chart3.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
