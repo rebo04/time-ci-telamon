@@ -195,7 +195,12 @@
             <th style="padding:12px 10px;">NP Actual</th>
             <th style="padding:12px 10px;">NP Nuevo</th>
             <th style="padding:12px 10px;">Cuenta</th>
-            <th style="padding:12px 10px;min-width:260px;">Descripción</th>
+            <th style="padding:12px 10px;min-width:240px;">Descripción</th>
+            <th style="padding:12px 10px;min-width:200px;">Comentarios</th>
+            <th style="padding:12px 10px;min-width:180px;">Issue</th>
+            <th style="padding:12px 10px;min-width:180px;">Acción Corr.</th>
+            <th style="padding:12px 10px;">PPAP Ent.</th>
+            <th style="padding:12px 10px;">PPAP Apr.</th>
             <th style="padding:12px 10px;">SOP Plan.</th>
             <th style="padding:12px 10px;">SOP Real</th>
             <th style="padding:12px 10px;">Mes</th>
@@ -506,7 +511,11 @@ function renderTable() {
     const s = getStatus(r);
     const bg = getRowBg(r);
     const R = bg ? `background:${bg};` : '';
-    const desc = r.descripcion.length>70 ? r.descripcion.slice(0,70)+'…' : r.descripcion;
+    const trunc = (t,n) => t && t.length>n ? t.slice(0,n)+'…' : (t||'');
+    const desc  = trunc(r.descripcion, 70);
+    const comt  = trunc(r.comentarios, 60);
+    const iss   = trunc(r.issue, 60);
+    const acn   = trunc(r.accionCorr, 60);
     const ano = calcAno(r);
     const mes = calcMes(r) || '–';
     const sem = calcSemana(r) || '–';
@@ -520,6 +529,11 @@ function renderTable() {
       <td style="padding:10px;${R}font-family:monospace;font-size:12px;">${r.npNuevo}</td>
       <td style="padding:10px;${R}font-size:12px;">${r.cuenta}</td>
       <td style="padding:10px;${R}font-size:12px;" title="${r.descripcion.replace(/"/g,'&quot;')}">${desc}</td>
+      <td style="padding:10px;${R}font-size:12px;" title="${(r.comentarios||'').replace(/"/g,'&quot;')}">${comt||'–'}</td>
+      <td style="padding:10px;${R}font-size:12px;" title="${(r.issue||'').replace(/"/g,'&quot;')}">${iss||'–'}</td>
+      <td style="padding:10px;${R}font-size:12px;" title="${(r.accionCorr||'').replace(/"/g,'&quot;')}">${acn||'–'}</td>
+      <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapEntregado||'–'}</td>
+      <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapAprob||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;">${r.sopPlaneado||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;">${r.sopReal||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;text-align:center;">${mes}</td>
@@ -977,7 +991,53 @@ ${mkAnchor(0,4,50,68,3,'rId3')}
     });
 
     // ════════════════════════════════════════════
-    // SHEET 3 — ASISTENCIA
+    // SHEET 3 — CI CON ESTADO (solo filas coloreadas)
+    // ════════════════════════════════════════════
+    const coloredRecs = records.filter(r => getRowBg(r) !== '');
+    const sh2b = wb.addWorksheet('CI Con Estado');
+    sh2b.columns = sh2.columns.map(c => ({width:c.width}));
+    const hRow2b = sh2b.getRow(1); hRow2b.height=36;
+    CI_HDRS.forEach((h,i) => hdrCell(hRow2b.getCell(i+1), h));
+    sh2b.views = [{state:'frozen',ySplit:1}];
+    sh2b.autoFilter = {from:{row:1,column:1}, to:{row:1,column:18}};
+
+    const bgToArgb = bg => {
+      if (bg === '#e8faf0') return 'FFE8FAF0'; // verde
+      if (bg === '#fde8e8') return 'FFFDE8E8'; // rojo
+      if (bg === '#fef8e7') return 'FFFEF8E7'; // amarillo
+      return 'FFFFFFFF';
+    };
+
+    coloredRecs.forEach((r,ri) => {
+      const s = getStatus(r);
+      const sc = statusColors(s);
+      const rowArgb = bgToArgb(getRowBg(r));
+      const vals = [
+        calcAno(r), s,
+        r.sup, r.platform, r.cell, r.npActual, r.npNuevo, r.cuenta,
+        r.descripcion, r.comentarios, r.issue, r.accionCorr,
+        r.ppapEntregado, r.ppapAprob, r.sopPlaneado, r.sopReal,
+        calcMes(r), calcSemana(r)
+      ];
+      const dRow = sh2b.getRow(2+ri); dRow.height=22;
+      vals.forEach((v,ci) => {
+        const cell = dRow.getCell(ci+1);
+        cell.value = v;
+        cell.alignment = {vertical:'middle', wrapText:ci===8||ci===9||ci===10||ci===11};
+        cell.border = {bottom:{style:'hair',color:{argb:C.gray2}}, right:{style:'hair',color:{argb:C.gray2}}};
+        if (ci<2) {
+          cell.font = {bold:true, color:{argb:sc.fg}};
+          cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:sc.bg}};
+          if(ci===1) cell.alignment.horizontal='center';
+        } else {
+          cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:rowArgb}};
+          cell.font = {size:10};
+        }
+      });
+    });
+
+    // ════════════════════════════════════════════
+    // SHEET 4 — ASISTENCIA
     // ════════════════════════════════════════════
     const sh3 = wb.addWorksheet('Asistencia');
     sh3.columns = [{width:18},{width:22},...meetingDates.flatMap(()=>[{width:22},{width:7}]),{width:10}];
