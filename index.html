@@ -927,29 +927,60 @@ async function exportToExcel() {
     sh4.columns = [
       {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10}
     ];
-    sh4.mergeCells('A1:H1');
-    Object.assign(sh4.getCell('A1'), {
+    // ── Resumen CI at top (2026 only)
+    sh4.mergeCells(1, 1, 1, 7);
+    Object.assign(sh4.getCell(1, 1), {
+      value: 'Resumen de Cambios de Ingeniería',
+      font: {bold:true, size:14, color:{argb:C.white}},
+      fill: {type:'pattern', pattern:'solid', fgColor:{argb:C.blueDark}},
+      alignment: {horizontal:'center', vertical:'middle'}
+    });
+    sh4.getRow(1).height = 36;
+    const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
+    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
+    sh4.getRow(2).height = 18;
+    const completedR4 = records
+      .filter(r => r.sopReal && r.sopReal.startsWith('2026'))
+      .sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
+    completedR4.forEach((r, i) => {
+      const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
+      const row = sh4.getRow(3 + i);
+      const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
+      const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
+      cells.forEach((v, ci) => {
+        const cell = row.getCell(ci + 1);
+        cell.value = v;
+        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
+        cell.font = ci===4 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
+        cell.alignment = {wrapText:true, vertical:'top'};
+        if (ci >= 5) row.height = Math.max(row.height||15, Math.ceil((v.length||0)/55)*15);
+      });
+    });
+
+    // ── Period tables start at row 56
+    sh4.mergeCells('A54:H54');
+    Object.assign(sh4.getCell('A54'), {
       value:'Cambios por Período',
       font:{bold:true,size:14,color:{argb:C.white}},
       fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
       alignment:{horizontal:'center',vertical:'middle'}
     });
-    sh4.getRow(1).height=36; sh4.getRow(2).height=8;
+    sh4.getRow(54).height=36; sh4.getRow(55).height=8;
 
     const monthData = buildMonthData(records);
     const weekData  = buildWeekData(records);
     const yearData  = buildYearData(records);
 
-    const G_DATA_START = 5; // title=3, header=4, data starts at 5
+    const G_DATA_START = 58; // section title=54, spacer=55, table titles=56, col headers=57, data starts at 58
     function writePeriodTable4(col, titleText, hdrLabels, pd) {
       const n = Math.min(pd.labels.length, 24);
-      sh4.mergeCells(3, col, 3, col+1);
-      const tC = sh4.getCell(3, col);
+      sh4.mergeCells(56, col, 56, col+1);
+      const tC = sh4.getCell(56, col);
       tC.value=titleText; tC.font={bold:true,size:11,color:{argb:C.white}};
       tC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
       tC.alignment={horizontal:'center',vertical:'middle'};
       [hdrLabels[0],hdrLabels[1]].forEach((h,i)=>{
-        const c=sh4.getCell(4,col+i);
+        const c=sh4.getCell(57,col+i);
         c.value=h; c.font={bold:true,color:{argb:C.white},size:10};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
         c.alignment={horizontal:'center',vertical:'middle'};
@@ -962,41 +993,12 @@ async function exportToExcel() {
         vC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
         vC.alignment={horizontal:'center'};
       }
-      sh4.getRow(3).height=20; sh4.getRow(4).height=18;
-      return G_DATA_START+n-1; // last data row
+      sh4.getRow(56).height=20; sh4.getRow(57).height=18;
+      return G_DATA_START+n-1;
     }
     const lastMesRowG  = writePeriodTable4(1,'Cambios por Mes',    ['Mes','Total'],    monthData);
     const lastSemRowG  = writePeriodTable4(4,'Cambios por Semana', ['Semana','Total'], weekData);
     const lastAnoRowG  = writePeriodTable4(7,'Cambios por Año',    ['Año','Total'],    yearData);
-
-    // ── Resumen CI (appended to Graficas sheet, below charts starting at row 72)
-    const RESUMEN_START = 72;
-    sh4.mergeCells(RESUMEN_START - 1, 1, RESUMEN_START - 1, 7);
-    Object.assign(sh4.getCell(RESUMEN_START - 1, 1), {
-      value: 'Resumen de Cambios de Ingeniería',
-      font: {bold:true, size:14, color:{argb:C.white}},
-      fill: {type:'pattern', pattern:'solid', fgColor:{argb:C.blueDark}},
-      alignment: {horizontal:'center', vertical:'middle'}
-    });
-    sh4.getRow(RESUMEN_START - 1).height = 36;
-    const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
-    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(RESUMEN_START, i + 1), h));
-    sh4.getRow(RESUMEN_START).height = 18;
-    const completedR4 = records.filter(r => r.sopReal).sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
-    completedR4.forEach((r, i) => {
-      const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
-      const row = sh4.getRow(RESUMEN_START + 1 + i);
-      const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
-      const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
-      cells.forEach((v, ci) => {
-        const cell = row.getCell(ci + 1);
-        cell.value = v;
-        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
-        cell.font = ci===4 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
-        cell.alignment = {wrapText:true, vertical:'top'};
-        if (ci >= 5) row.height = Math.max(row.height||15, Math.ceil((v.length||0)/55)*15);
-      });
-    });
 
     // Period chart XML (reference Graficas sheet cells)
     const periodBarXml = (title, catRef, valRef, color) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -1023,15 +1025,15 @@ async function exportToExcel() {
       `&apos;Graficas&apos;!$G$${G_DATA_START}:$G$${lastAnoRowG}`,
       `&apos;Graficas&apos;!$H$${G_DATA_START}:$H$${lastAnoRowG}`, '22c55e');
 
-    // Drawing2: charts on Graficas sheet — placed BELOW the data tables
-    // Tables end at max row 28 (5 + 24 - 1). Charts start at drawing row 30 (=Excel row 31).
+    // Drawing2: charts on Graficas sheet — placed BELOW period data tables
+    // Period data ends at max row 81 (58 + 24 - 1). Charts start at drawing row 83 (=Excel row 84).
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
 `<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
     const DRAWING2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
-${mkAnchor(0,4,30,48,1,'rId1')}
-${mkAnchor(4,8,30,48,2,'rId2')}
-${mkAnchor(0,4,50,68,3,'rId3')}
+${mkAnchor(0,4,83,101,1,'rId1')}
+${mkAnchor(4,8,83,101,2,'rId2')}
+${mkAnchor(0,4,103,121,3,'rId3')}
 </xdr:wsDr>`;
     const DRAWING2_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
