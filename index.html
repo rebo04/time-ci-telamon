@@ -80,7 +80,6 @@
     <button class="tab-btn active" id="tab-dashboard" onclick="showTab('dashboard')">Resumen</button>
     <button class="tab-btn" id="tab-ci" onclick="showTab('ci')">Cambios CI</button>
     <button class="tab-btn" id="tab-asistencia" onclick="showTab('asistencia')">Asistencia</button>
-    <button class="tab-btn" id="tab-resumen" onclick="showTab('resumen')">Resumen CI</button>
   </div>
 </div>
 
@@ -145,6 +144,26 @@
         </div>
       </div>
       <canvas id="chart-time" height="100"></canvas>
+    </div>
+
+    <!-- RESUMEN CI (embedded in dashboard) -->
+    <div id="panel-resumen" style="margin-top:24px;">
+      <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <h2 style="font-size:17px;font-weight:700;color:#1e293b;">Resumen de Cambios de Ingeniería</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:13px;font-weight:600;color:#374151;">Año:</label>
+          <select id="resumen-year" onchange="renderResumen()" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 10px;font-size:13px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <span id="resumen-count" style="font-size:13px;color:#6b7280;margin-left:auto;"></span>
+      </div>
+      <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
+        <table id="resumen-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead id="resumen-head"></thead>
+          <tbody id="resumen-body"></tbody>
+        </table>
+      </div>
     </div>
 
   </div>
@@ -239,25 +258,6 @@
     <p style="font-size:13px;color:#9ca3af;margin-top:10px;text-align:center;">Haz clic para cambiar la asistencia · Los cambios se guardan automáticamente para todos</p>
   </div>
 
-  <!-- RESUMEN CI -->
-  <div id="panel-resumen" style="display:none;">
-    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <h2 style="font-size:17px;font-weight:700;color:#1e293b;">Resumen de Cambios de Ingeniería</h2>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <label style="font-size:13px;font-weight:600;color:#374151;">Año:</label>
-        <select id="resumen-year" onchange="renderResumen()" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 10px;font-size:13px;">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <span id="resumen-count" style="font-size:13px;color:#6b7280;margin-left:auto;"></span>
-    </div>
-    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
-      <table id="resumen-table" style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead id="resumen-head"></thead>
-        <tbody id="resumen-body"></tbody>
-      </table>
-    </div>
-  </div>
 </div>
 
 <!-- MODAL -->
@@ -354,14 +354,13 @@ function getRowBg(r) {
 // ── Tabs
 function showTab(t) {
   currentTab = t;
-  ['dashboard','ci','asistencia','resumen'].forEach(id => {
+  ['dashboard','ci','asistencia'].forEach(id => {
     document.getElementById('panel-'+id).style.display = id===t ? '' : 'none';
     document.getElementById('tab-'+id).classList.toggle('active', id===t);
   });
-  if (t==='dashboard') renderDashboard();
+  if (t==='dashboard') { renderDashboard(); renderResumen(); }
   if (t==='ci') renderTable();
   if (t==='asistencia') renderAttendance();
-  if (t==='resumen') renderResumen();
 }
 
 // ── Dashboard helpers
@@ -1351,9 +1350,8 @@ function initListeners() {
   db.collection('records').onSnapshot(snap => {
     records = snap.docs.map(d => ({...d.data(), _docId: d.id}));
     records.sort((a,b) => (a.id||0)-(b.id||0));
-    if (currentTab==='dashboard') renderDashboard();
+    if (currentTab==='dashboard') { renderDashboard(); renderResumen(); }
     if (currentTab==='ci') renderTable();
-    if (currentTab==='resumen') renderResumen();
   });
   db.collection('people').onSnapshot(snap => {
     people = snap.docs.map(d => ({...d.data(), _docId: d.id}));
