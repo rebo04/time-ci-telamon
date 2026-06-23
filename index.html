@@ -241,8 +241,14 @@
 
   <!-- RESUMEN CI -->
   <div id="panel-resumen" style="display:none;">
-    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <h2 style="font-size:17px;font-weight:700;color:#1e293b;">Resumen de Cambios de Ingeniería</h2>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;font-weight:600;color:#374151;">Año:</label>
+        <select id="resumen-year" onchange="renderResumen()" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 10px;font-size:13px;">
+          <option value="">Todos</option>
+        </select>
+      </div>
       <span id="resumen-count" style="font-size:13px;color:#6b7280;margin-left:auto;"></span>
     </div>
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
@@ -754,11 +760,20 @@ const DRAWING1_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 // ── Export to Excel (ExcelJS datos + gráficas reales via JSZip template)
 function renderResumen() {
-  const completed = records
+  const allCompleted = records
     .filter(r => r.sopReal)
     .sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
 
-  document.getElementById('resumen-count').textContent = completed.length + ' cambios implementados';
+  // Populate year dropdown from available data
+  const years = [...new Set(allCompleted.map(r => r.sopReal.slice(0,4)))].sort();
+  const sel = document.getElementById('resumen-year');
+  const curYear = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + years.map(y=>`<option value="${y}"${y===curYear?' selected':''}>${y}</option>`).join('');
+
+  const filterYear = sel.value;
+  const completed = filterYear ? allCompleted.filter(r => r.sopReal.startsWith(filterYear)) : allCompleted;
+
+  document.getElementById('resumen-count').textContent = completed.length + ' cambios implementados' + (filterYear ? ` en ${filterYear}` : '');
 
   const HDR = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
   document.getElementById('resumen-head').innerHTML =
