@@ -80,6 +80,7 @@
     <button class="tab-btn active" id="tab-dashboard" onclick="showTab('dashboard')">Resumen</button>
     <button class="tab-btn" id="tab-ci" onclick="showTab('ci')">Cambios CI</button>
     <button class="tab-btn" id="tab-asistencia" onclick="showTab('asistencia')">Asistencia</button>
+    <button class="tab-btn" id="tab-resumen" onclick="showTab('resumen')">Resumen CI</button>
   </div>
 </div>
 
@@ -237,6 +238,20 @@
     </div>
     <p style="font-size:13px;color:#9ca3af;margin-top:10px;text-align:center;">Haz clic para cambiar la asistencia · Los cambios se guardan automáticamente para todos</p>
   </div>
+
+  <!-- RESUMEN CI -->
+  <div id="panel-resumen" style="display:none;">
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+      <h2 style="font-size:17px;font-weight:700;color:#1e293b;">Resumen de Cambios de Ingeniería</h2>
+      <span id="resumen-count" style="font-size:13px;color:#6b7280;margin-left:auto;"></span>
+    </div>
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
+      <table id="resumen-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead id="resumen-head"></thead>
+        <tbody id="resumen-body"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL -->
@@ -333,13 +348,14 @@ function getRowBg(r) {
 // ── Tabs
 function showTab(t) {
   currentTab = t;
-  ['dashboard','ci','asistencia'].forEach(id => {
+  ['dashboard','ci','asistencia','resumen'].forEach(id => {
     document.getElementById('panel-'+id).style.display = id===t ? '' : 'none';
     document.getElementById('tab-'+id).classList.toggle('active', id===t);
   });
   if (t==='dashboard') renderDashboard();
   if (t==='ci') renderTable();
   if (t==='asistencia') renderAttendance();
+  if (t==='resumen') renderResumen();
 }
 
 // ── Dashboard helpers
@@ -737,6 +753,38 @@ const DRAWING1_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </Relationships>`;
 
 // ── Export to Excel (ExcelJS datos + gráficas reales via JSZip template)
+function renderResumen() {
+  const completed = records
+    .filter(r => r.sopReal)
+    .sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
+
+  document.getElementById('resumen-count').textContent = completed.length + ' cambios implementados';
+
+  const HDR = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
+  document.getElementById('resumen-head').innerHTML =
+    `<tr style="background:#1e3a8a;color:white;">
+      ${HDR.map(h=>`<th style="padding:10px 12px;text-align:left;font-size:12px;white-space:nowrap;">${h}</th>`).join('')}
+    </tr>`;
+
+  const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '–';
+
+  document.getElementById('resumen-body').innerHTML = completed.map((r,i) => {
+    const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
+    const rowBg  = i%2===0 ? '#f8fafc' : '#ffffff';
+    const timeBg = onTime ? '#dcfce7' : '#fee2e2';
+    const timeFg = onTime ? '#15803d' : '#b91c1c';
+    return `<tr style="background:${rowBg};border-bottom:1px solid #e2e8f0;">
+      <td style="padding:9px 12px;">${r.cell||'–'}</td>
+      <td style="padding:9px 12px;">${r.platform||'–'}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">${fmt(r.sopPlaneado)}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">${fmt(r.sopReal)}</td>
+      <td style="padding:9px 12px;text-align:center;"><span style="background:${timeBg};color:${timeFg};padding:2px 10px;border-radius:9999px;font-weight:700;font-size:12px;">${onTime ? 'Sí' : 'No'}</span></td>
+      <td style="padding:9px 12px;max-width:260px;font-size:12px;">${r.issue||'–'}</td>
+      <td style="padding:9px 12px;max-width:260px;font-size:12px;">${r.accionCorr||'–'}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function exportToExcel() {
   const btn = document.querySelector('button[onclick="exportToExcel()"]');
   btn.textContent = '⏳ Generando...'; btn.disabled = true;
@@ -1127,6 +1175,51 @@ ${mkAnchor(0,4,50,68,3,'rId3')}
       totC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
     });
 
+    // ── Resumen CI sheet ─────────────────────────────────────────────────────
+    const shR = wb.addWorksheet('Resumen CI');
+    shR.views = [{ showGridLines: false }];
+    shR.columns = [
+      {width:14},{width:16},{width:16},{width:16},{width:12},{width:40},{width:40}
+    ];
+    shR.mergeCells('A1:G1');
+    Object.assign(shR.getCell('A1'),{
+      value:'Resumen de Cambios de Ingeniería',
+      font:{bold:true,size:14,color:{argb:C.white}},
+      fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
+      alignment:{horizontal:'center',vertical:'middle'}
+    });
+    shR.getRow(1).height=36;
+    shR.mergeCells('A2:G2');
+    Object.assign(shR.getCell('A2'),{
+      value:`Exportado el ${new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})} · Creado por Arturo Rebolledo`,
+      font:{italic:true,size:10,color:{argb:C.grayText}},
+      alignment:{horizontal:'center'}
+    });
+    shR.getRow(3).height=8;
+    const RHdrs = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
+    RHdrs.forEach((h,i) => hdrCell(shR.getCell(4, i+1), h));
+    shR.getRow(4).height=18;
+    const completedR = records.filter(r=>r.sopReal).sort((a,b)=>(a.sopReal||'').localeCompare(b.sopReal||''));
+    completedR.forEach((r,i) => {
+      const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
+      const row = shR.getRow(5+i);
+      const bg = i%2===0 ? C.gray : 'FFFFFFFF';
+      const cells = [
+        r.cell||'', r.platform||'',
+        r.sopPlaneado||'', r.sopReal||'',
+        onTime ? 'Sí' : 'No',
+        r.issue||'', r.accionCorr||''
+      ];
+      cells.forEach((v,ci) => {
+        const cell = row.getCell(ci+1);
+        cell.value = v;
+        cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
+        cell.font = ci===4 ? {bold:true,color:{argb: onTime?C.greenFg:C.redFg}} : {};
+        cell.alignment = {wrapText:true, vertical:'top'};
+        if (ci>=5) row.height=Math.max(row.height||15, Math.ceil((v.length||0)/55)*15);
+      });
+    });
+
     // ── Generate ExcelJS buffer then inject real charts via JSZip
     const excelBuffer = await wb.xlsx.writeBuffer();
     const excelZip = await JSZip.loadAsync(excelBuffer);
@@ -1245,6 +1338,7 @@ function initListeners() {
     records.sort((a,b) => (a.id||0)-(b.id||0));
     if (currentTab==='dashboard') renderDashboard();
     if (currentTab==='ci') renderTable();
+    if (currentTab==='resumen') renderResumen();
   });
   db.collection('people').onSnapshot(snap => {
     people = snap.docs.map(d => ({...d.data(), _docId: d.id}));
