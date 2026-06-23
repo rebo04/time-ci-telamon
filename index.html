@@ -925,10 +925,10 @@ async function exportToExcel() {
     const sh4 = wb.addWorksheet('Graficas');
     sh4.views = [{ showGridLines: false }];
     sh4.columns = [
-      {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10}
+      {width:12},{width:12},{width:16},{width:18},{width:10},{width:8},{width:12},{width:10}
     ];
     // ── Resumen CI at top (2026 only)
-    sh4.mergeCells(1, 1, 1, 7);
+    sh4.mergeCells(1, 1, 1, 5);
     Object.assign(sh4.getCell(1, 1), {
       value: 'Resumen de Cambios de Ingeniería',
       font: {bold:true, size:14, color:{argb:C.white}},
@@ -936,7 +936,7 @@ async function exportToExcel() {
       alignment: {horizontal:'center', vertical:'middle'}
     });
     sh4.getRow(1).height = 36;
-    const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
+    const RHdrs4 = ['En Tiempo','Mes','Célula','Cliente','Semana'];
     RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
     sh4.getRow(2).height = 18;
     const completedR4 = records
@@ -946,15 +946,15 @@ async function exportToExcel() {
       const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
       const row = sh4.getRow(3 + i);
       const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
-      const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
+      const cells = [onTime?'Sí':'No', calcMes(r)||'', r.cell||'', r.platform||'', calcSemana(r)||''];
       cells.forEach((v, ci) => {
         const cell = row.getCell(ci + 1);
         cell.value = v;
-        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
-        cell.font = ci===4 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
-        cell.alignment = {wrapText:true, vertical:'top'};
-        if (ci >= 5) row.height = Math.max(row.height||15, Math.ceil((v.length||0)/55)*15);
+        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===0 ? (onTime?C.greenBg:C.redBg) : bg}};
+        cell.font = ci===0 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
+        cell.alignment = {vertical:'middle', horizontal: ci===0?'center':'left'};
       });
+      row.height = 18;
     });
 
     // ── Period tables start at row 56
