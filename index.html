@@ -169,6 +169,11 @@
   <!-- CI TABLE -->
   <div id="panel-ci" style="display:none;">
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:16px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;">
+      <div style="min-width:110px;"><label>Año</label>
+        <select id="f-year" onchange="renderTable()">
+          <option value="">Todos</option>
+        </select>
+      </div>
       <div style="min-width:150px;"><label>Supervisor</label>
         <select id="f-sup" onchange="renderTable()">
           <option value="">Todos</option><option>Gabriela</option><option>Julio</option>
@@ -574,6 +579,15 @@ function renderDashboard() {
 }
 
 // ── CI Table
+function populateYearFilter() {
+  const sel = document.getElementById('f-year');
+  const cur = sel.value;
+  const years = [...new Set(records.map(r => String(calcAno(r))))].sort((a,b) => {
+    if (a==='Abierto') return 1; if (b==='Abierto') return -1; return +a - +b;
+  });
+  sel.innerHTML = '<option value="">Todos</option>' + years.map(y => `<option${y===cur?' selected':''}>${y}</option>`).join('');
+}
+
 function populateCellFilter() {
   const sel = document.getElementById('f-cell');
   const cur = sel.value;
@@ -586,12 +600,14 @@ function populateCellFilter() {
 }
 
 function getFiltered() {
+  const year = document.getElementById('f-year').value;
   const sup = document.getElementById('f-sup').value.toLowerCase();
   const plat = document.getElementById('f-platform').value.toLowerCase();
   const status = document.getElementById('f-status').value;
   const cell = document.getElementById('f-cell').value;
   const q = document.getElementById('f-search').value.toLowerCase();
   return records.filter(r => {
+    if (year && String(calcAno(r))!==year) return false;
     if (sup && r.sup.toLowerCase()!==sup) return false;
     if (plat && r.platform.toLowerCase()!==plat) return false;
     if (status && getStatus(r)!==status) return false;
@@ -1483,6 +1499,7 @@ function initListeners() {
   db.collection('records').onSnapshot(snap => {
     records = snap.docs.map(d => ({...d.data(), _docId: d.id}));
     records.sort((a,b) => (a.id||0)-(b.id||0));
+    populateYearFilter();
     populateCellFilter();
     if (currentTab==='dashboard') renderDashboard();
     if (currentTab==='ci') renderTable();
