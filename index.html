@@ -52,8 +52,23 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" style="position:fixed;inset:0;background:#1e3a8a;z-index:200;display:flex;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:16px;padding:40px 48px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;margin:16px;">
+    <h1 style="font-size:22px;font-weight:800;color:#1e3a8a;margin:0 0 4px;">Time CI</h1>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Control de Cambios de Ingeniería · Telamon de México</p>
+    <div style="text-align:left;margin-bottom:14px;">
+      <label style="font-weight:600;color:#374151;font-size:14px;display:block;margin-bottom:6px;">Contraseña</label>
+      <input type="password" id="login-pw" style="border:2px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:16px;width:100%;box-sizing:border-box;" placeholder="Ingresa tu contraseña" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <p id="login-error" style="color:#b91c1c;font-size:13px;font-weight:600;margin:0 0 12px;display:none;">Contraseña incorrecta</p>
+    <button onclick="doLogin()" style="width:100%;background:#1e40af;color:white;padding:12px;border-radius:8px;font-size:16px;font-weight:700;border:none;cursor:pointer;">Entrar</button>
+    <p style="color:#9ca3af;font-size:11px;margin:20px 0 0;">Creado por Arturo Rebolledo</p>
+  </div>
+</div>
+
 <!-- LOADING OVERLAY -->
-<div id="loading-overlay">
+<div id="loading-overlay" style="display:none;">
   <div class="spinner"></div>
   <p style="font-size:17px;font-weight:600;color:#1e40af;">Cargando datos...</p>
   <p id="loading-msg" style="font-size:13px;color:#6b7280;">Conectando con Firebase</p>
@@ -68,6 +83,7 @@
       <h1 style="font-size:22px;font-weight:800;letter-spacing:-.3px;">Time CI – Control de Cambios de Ingeniería</h1>
       <p style="color:#93c5fd;font-size:13px;margin-top:2px;">
         <span id="sync-dot"></span><span id="sync-label">Sincronizado</span>
+        &nbsp;·&nbsp; <span id="user-label"></span>
         &nbsp;·&nbsp; Creado por Arturo Rebolledo
       </p>
       </div>
@@ -305,6 +321,27 @@
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════════════
+const USERS = { '2712': 'Gabriela', 'JulioM': 'Julio' };
+let currentUser = '';
+
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (USERS[pw]) {
+    currentUser = USERS[pw];
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('user-label').textContent = currentUser;
+    init();
+  } else {
+    document.getElementById('login-error').style.display = '';
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
 // ═══════════════════════════════════════════════════
 // FIREBASE CONFIG — pega aquí tu configuración
 // ═══════════════════════════════════════════════════
@@ -1468,7 +1505,7 @@ async function init() {
 }
 
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
-init();
+document.getElementById('login-pw').focus();
 </script>
 </body>
 </html>
