@@ -728,11 +728,12 @@ function renderAttendance() {
   }
 
   const visiblePeople = attDeptFilter ? people.filter(p=>p.dept===attDeptFilter) : people;
+  const displayDates = [...meetingDates].reverse();
 
   head.innerHTML = `<tr style="background:#1e3a8a;color:white;text-align:center;">
     <th style="padding:12px 14px;text-align:left;position:sticky;left:0;background:#1e3a8a;min-width:160px;z-index:2;">Departamento</th>
     <th style="padding:12px 14px;text-align:left;position:sticky;left:160px;background:#1e3a8a;min-width:160px;z-index:2;">Responsable</th>
-    ${meetingDates.map(d => {
+    ${displayDates.map(d => {
       const dt = new Date(d+'T12:00:00');
       const lbl = dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});
       const cnt = visiblePeople.filter(p=>p.attendance&&p.attendance[d]===1).length;
@@ -752,7 +753,7 @@ function renderAttendance() {
     return `<tr style="border-top:1px solid #f1f5f9;background:${bg};">
       <td style="padding:10px 14px;font-weight:600;font-size:13px;color:#4b5563;position:sticky;left:0;background:${bg};z-index:1;">${p.dept||''}</td>
       <td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:160px;background:${bg};z-index:1;">${p.name}</td>
-      ${meetingDates.map(d => {
+      ${displayDates.map(d => {
         const v = p.attendance?.[d];
         const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${globalIdx})"`;
         if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes"${tgl}>&#10003;</div></td>`;
@@ -766,7 +767,8 @@ function renderAttendance() {
 
 async function toggleAtt(docId, date, pi) {
   const cur = people[pi].attendance?.[date];
-  const newVal = cur===1 ? 0 : 1;
+  // Cycle: present (1) → absent (0) → not required (null) → present (1)
+  const newVal = cur===1 ? 0 : cur===0 ? null : 1;
   setSyncing(true);
   try {
     await db.collection('people').doc(docId).update({ [`attendance.${date}`]: newVal });
