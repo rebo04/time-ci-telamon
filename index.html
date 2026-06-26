@@ -354,6 +354,44 @@
   </div>
 </div>
 
+<!-- MODAL: Nueva Persona -->
+<div id="modal-person" class="modal-ov" style="display:none;">
+  <div style="background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:440px;margin:16px;">
+    <div style="background:#1e3a8a;color:white;padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="font-size:18px;font-weight:700;">Nueva Persona</h2>
+      <button onclick="closePersonModal()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;font-weight:700;line-height:1;">✕</button>
+    </div>
+    <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
+      <div>
+        <label>Nombre *</label>
+        <input type="text" id="person-name" placeholder="Ej: Juan García" style="width:100%;box-sizing:border-box;">
+      </div>
+      <div>
+        <label>Departamento(s) * <span style="font-size:11px;color:#6b7280;text-transform:none;font-weight:400;">(Ctrl+clic para seleccionar varios)</span></label>
+        <select id="person-dept" multiple size="8" style="width:100%;box-sizing:border-box;border:1.5px solid #d1d5db;border-radius:8px;padding:4px;font-size:13px;font-weight:500;">
+          <option>APQP</option>
+          <option>CONFIABILIDAD</option>
+          <option>CALIDAD EF</option>
+          <option>AUTOMATIZACION</option>
+          <option>MANTENIMIENTO EF</option>
+          <option>MANTENIMIENTO PLANTA</option>
+          <option>CONTROL DE PRODUCCION</option>
+          <option>EMBARQUES</option>
+          <option>MANUFACTURA B10</option>
+          <option>MANUFACTURA B12</option>
+          <option>CORTE/SLP</option>
+          <option>ETIQUETAS</option>
+          <option>SEGURIDAD</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closePersonModal()" style="padding:9px 20px;border-radius:8px;border:1.5px solid #d1d5db;background:white;color:#374151;font-size:14px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button onclick="saveNewPerson()" class="btn-p">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════
 // LOGIN
@@ -839,13 +877,24 @@ async function removeMeeting(d) {
   setSyncing(false);
 }
 
-async function addPerson() {
-  const dept = prompt('Departamento:');
-  if (dept===null) return;
-  const name = prompt('Nombre:');
-  if (!name||!name.trim()) return;
+function addPerson() {
+  document.getElementById('person-name').value = '';
+  Array.from(document.getElementById('person-dept').options).forEach(o => o.selected = false);
+  document.getElementById('modal-person').style.display = 'flex';
+  document.getElementById('person-name').focus();
+}
+function closePersonModal() {
+  document.getElementById('modal-person').style.display = 'none';
+}
+async function saveNewPerson() {
+  const name = document.getElementById('person-name').value.trim();
+  const selected = Array.from(document.getElementById('person-dept').selectedOptions).map(o => o.value);
+  if (!name) { alert('Ingresa un nombre.'); return; }
+  if (!selected.length) { alert('Selecciona al menos un departamento.'); return; }
+  const dept = selected.join(' / ');
+  closePersonModal();
   setSyncing(true);
-  try { await db.collection('people').add({dept:dept.trim(), name:name.trim(), attendance:{}}); }
+  try { await db.collection('people').add({dept, name, attendance:{}}); }
   catch(err) { alert('Error: '+err.message); }
   setSyncing(false);
 }
@@ -1598,6 +1647,7 @@ async function init() {
 }
 
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
+document.getElementById('modal-person').addEventListener('click', e => { if(e.target===document.getElementById('modal-person')) closePersonModal(); });
 document.getElementById('login-pw').focus();
 
 document.addEventListener('keydown', e => {
@@ -1612,6 +1662,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') {
     if (document.getElementById('modal').style.display !== 'none') { closeModal(); return; }
+    if (document.getElementById('modal-person').style.display !== 'none') { closePersonModal(); return; }
     if (document.activeElement === cellEl) { cellEl.blur(); }
     return;
   }
