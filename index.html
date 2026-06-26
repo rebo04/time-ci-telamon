@@ -285,6 +285,9 @@
       <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;"><span style="background:#fee2e2;border-radius:5px;padding:2px 8px;font-weight:700;">✗</span> No presente</span>
       <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;"><span style="background:#f3f4f6;border-radius:5px;padding:2px 8px;font-weight:700;color:#9ca3af;">–</span> No requerido</span>
     </div>
+    <!-- Dept summary -->
+    <div id="att-summary" style="margin-bottom:14px;"></div>
+
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
       <table id="att-table" style="font-size:13px;width:max-content;min-width:100%;">
         <thead id="att-head"></thead>
@@ -461,6 +464,7 @@ let currentTimePeriod = 'mes';
 const FIELDS = ['sup','platform','cell','cuenta','npActual','npNuevo','descripcion','comentarios','ppapEntregado','ppapAprob','sopPlaneado','sopReal','issue','accionCorr'];
 let colVisible = { estatus: false, mes: false, semana: false, issue: false, accionCorr: false };
 let attDeptFilter = '';
+const ALL_DEPTS = ['APQP','CONFIABILIDAD','CALIDAD EF','AUTOMATIZACION','MANTENIMIENTO EF','MANTENIMIENTO PLANTA','CONTROL DE PRODUCCION','EMBARQUES','MANUFACTURA B10','MANUFACTURA B12','CORTE/SLP','ETIQUETAS','SEGURIDAD'];
 
 // ── Sync indicator
 function setSyncing(on) {
@@ -784,6 +788,46 @@ async function deleteRecord(id) {
   setSyncing(false);
 }
 
+// ── Attendance dept summary
+function renderAttSummary() {
+  const el = document.getElementById('att-summary');
+  if (!el) return;
+
+  // Flatten multi-dept entries (stored as "DEPT A / DEPT B")
+  const registeredDepts = new Set();
+  people.forEach(p => {
+    (p.dept||'').split('/').forEach(d => registeredDepts.add(d.trim().toUpperCase()));
+  });
+
+  const missing = ALL_DEPTS.filter(d => !registeredDepts.has(d));
+  const present = ALL_DEPTS.filter(d => registeredDepts.has(d));
+
+  el.innerHTML = `
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:16px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:13px;font-weight:700;color:#1e293b;">Cobertura por Departamento</span>
+        <span style="font-size:12px;color:#6b7280;">${present.length} de ${ALL_DEPTS.length} departamentos registrados
+          ${missing.length ? `· <span style="color:#b91c1c;font-weight:600;">${missing.length} sin participación</span>` : '· <span style="color:#15803d;font-weight:600;">Cobertura completa</span>'}
+        </span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${ALL_DEPTS.map(d => {
+          const has = registeredDepts.has(d);
+          return `<span style="
+            display:inline-flex;align-items:center;gap:5px;
+            padding:5px 11px;border-radius:6px;font-size:12px;font-weight:600;
+            background:${has ? '#f0fdf4' : '#fef2f2'};
+            color:${has ? '#166534' : '#991b1b'};
+            border:1px solid ${has ? '#bbf7d0' : '#fecaca'};
+          ">
+            <span style="width:7px;height:7px;border-radius:50%;background:${has ? '#16a34a' : '#dc2626'};flex-shrink:0;"></span>
+            ${d}
+          </span>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 // ── Attendance
 function renderAttendance() {
   const head = document.getElementById('att-head');
@@ -834,6 +878,8 @@ function renderAttendance() {
       <td style="padding:10px 8px;text-align:center;font-weight:700;color:#1e40af;">${total}/${meetingDates.length}</td>
     </tr>`;
   }).join('');
+
+  renderAttSummary();
 }
 
 async function toggleAtt(docId, date, pi) {
