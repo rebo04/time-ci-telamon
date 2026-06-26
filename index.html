@@ -48,6 +48,11 @@
     #sync-dot{width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:6px}
     #sync-dot.syncing{background:#f59e0b;animation:pulse 1s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .col-toggle-btn{padding:4px 11px;border-radius:6px;border:1.5px solid #d1d5db;background:#f9fafb;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+    .col-toggle-btn.active{background:#1e40af;color:white;border-color:#1e40af}
+    .col-toggle-btn:hover:not(.active){background:#eff6ff;border-color:#93c5fd;color:#1e40af}
+    .ci-row-focus>td{background:#dbeafe!important;box-shadow:inset 0 0 0 2px #3b82f6;}
+    kbd{background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;padding:1px 5px;font-size:11px;font-family:monospace;}
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -215,32 +220,19 @@
         <span style="display:inline-block;width:16px;height:16px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;flex-shrink:0;"></span>Sin fecha (TBD)
       </span>
     </div>
+    <!-- Column toggles -->
+    <div style="background:white;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 20px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-weight:700;font-size:13px;color:#374151;margin-right:4px;">Mostrar columnas:</span>
+      <button id="col-btn-estatus"    class="col-toggle-btn" onclick="toggleCol('estatus')">Estatus</button>
+      <button id="col-btn-mes"        class="col-toggle-btn" onclick="toggleCol('mes')">Mes</button>
+      <button id="col-btn-semana"     class="col-toggle-btn" onclick="toggleCol('semana')">Semana</button>
+      <button id="col-btn-issue"      class="col-toggle-btn" onclick="toggleCol('issue')">Issue</button>
+      <button id="col-btn-accionCorr" class="col-toggle-btn" onclick="toggleCol('accionCorr')">Acción Corr.</button>
+      <span style="font-size:12px;color:#9ca3af;margin-left:auto;"><kbd>/</kbd> o <kbd>Ctrl+F</kbd> buscar · <kbd>↑↓</kbd> navegar · <kbd>Enter</kbd> editar · <kbd>Esc</kbd> cerrar</span>
+    </div>
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
-      <table style="width:100%;font-size:13px;">
-        <thead>
-          <tr style="background:#1e3a8a;color:white;text-align:left;">
-            <th style="padding:12px 10px;">#</th>
-            <th style="padding:12px 10px;">Año</th>
-            <th style="padding:12px 10px;">Supervisor</th>
-            <th style="padding:12px 10px;">Plataforma</th>
-            <th style="padding:12px 10px;">Célula</th>
-            <th style="padding:12px 10px;">NP Actual</th>
-            <th style="padding:12px 10px;">NP Nuevo</th>
-            <th style="padding:12px 10px;">Cuenta</th>
-            <th style="padding:12px 10px;min-width:240px;">Descripción</th>
-            <th style="padding:12px 10px;min-width:200px;">Comentarios</th>
-            <th style="padding:12px 10px;min-width:180px;">Issue</th>
-            <th style="padding:12px 10px;min-width:180px;">Acción Corr.</th>
-            <th style="padding:12px 10px;">PPAP Ent.</th>
-            <th style="padding:12px 10px;">PPAP Apr.</th>
-            <th style="padding:12px 10px;">SOP Plan.</th>
-            <th style="padding:12px 10px;">SOP Real</th>
-            <th style="padding:12px 10px;">Mes</th>
-            <th style="padding:12px 10px;">Semana</th>
-            <th style="padding:12px 10px;">Estatus</th>
-            <th id="th-acciones" style="padding:12px 10px;">Acciones</th>
-          </tr>
-        </thead>
+      <table id="ci-table" style="width:100%;font-size:13px;">
+        <thead id="ci-thead"></thead>
         <tbody id="ci-tbody"></tbody>
       </table>
       <p id="tbl-empty" style="display:none;text-align:center;color:#9ca3af;padding:40px;font-size:15px;">Sin resultados</p>
@@ -250,8 +242,14 @@
 
   <!-- ASISTENCIA -->
   <div id="panel-asistencia" style="display:none;">
-    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <h2 style="font-size:17px;font-weight:700;color:#1e293b;">Registro de Asistencia</h2>
+      <div style="min-width:220px;">
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Filtrar por Departamento</label>
+        <select id="att-dept-filter" onchange="attDeptFilter=this.value;renderAttendance()" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 10px;font-size:13px;width:100%;">
+          <option value="">Todos los departamentos</option>
+        </select>
+      </div>
       <div style="margin-left:auto;display:flex;gap:10px;">
         <button id="btn-add-meeting" onclick="addMeeting()" class="btn-p">+ Nueva Reunión</button>
         <button id="btn-add-person" onclick="addPerson()" class="btn-p" style="background:#7c3aed;">+ Nueva Persona</button>
@@ -393,11 +391,22 @@ let currentTab = 'dashboard';
 let chartP, chartS, chartTime;
 let currentTimePeriod = 'mes';
 const FIELDS = ['sup','platform','cell','cuenta','npActual','npNuevo','descripcion','comentarios','ppapEntregado','ppapAprob','sopPlaneado','sopReal','issue','accionCorr'];
+let colVisible = { estatus: false, mes: false, semana: false, issue: false, accionCorr: false };
+let attDeptFilter = '';
+let ciSelectedRow = -1;
+let ciFilteredRows = [];
 
 // ── Sync indicator
 function setSyncing(on) {
   document.getElementById('sync-dot').classList.toggle('syncing', on);
   document.getElementById('sync-label').textContent = on ? 'Guardando…' : 'Sincronizado';
+}
+
+// ── Column toggle
+function toggleCol(col) {
+  colVisible[col] = !colVisible[col];
+  document.getElementById('col-btn-'+col).classList.toggle('active', colVisible[col]);
+  renderTable();
 }
 
 // ── Status
@@ -621,23 +630,41 @@ function getFiltered() {
 }
 
 function renderTable() {
-  const rows = getFiltered();
+  ciFilteredRows = getFiltered();
+  ciSelectedRow = -1;
+  const rows = ciFilteredRows;
   const tbody = document.getElementById('ci-tbody');
+  const thead = document.getElementById('ci-thead');
   document.getElementById('tbl-empty').style.display = rows.length?'none':'';
   document.getElementById('tbl-count').textContent = rows.length?`Mostrando ${rows.length} de ${records.length} cambios`:'';
-  tbody.innerHTML = rows.map(r => {
+
+  const TH = (txt, extra='') => `<th style="padding:12px 10px;${extra}">${txt}</th>`;
+  thead.innerHTML = `<tr style="background:#1e3a8a;color:white;text-align:left;">
+    ${TH('#')}${TH('Año')}${TH('Supervisor')}${TH('Plataforma')}${TH('Célula')}
+    ${TH('NP Actual')}${TH('NP Nuevo')}${TH('Cuenta')}
+    ${TH('Descripción','min-width:240px;')}${TH('Comentarios','min-width:200px;')}
+    ${colVisible.issue      ? TH('Issue','min-width:180px;')         : ''}
+    ${colVisible.accionCorr ? TH('Acción Corr.','min-width:180px;') : ''}
+    ${TH('PPAP Ent.')}${TH('PPAP Apr.')}${TH('SOP Plan.')}${TH('SOP Real')}
+    ${colVisible.mes    ? TH('Mes')    : ''}
+    ${colVisible.semana ? TH('Semana') : ''}
+    ${colVisible.estatus? TH('Estatus'): ''}
+    ${readOnly ? '' : TH('Acciones')}
+  </tr>`;
+
+  tbody.innerHTML = rows.map((r, idx) => {
     const s = getStatus(r);
     const bg = getRowBg(r);
     const R = bg ? `background:${bg};` : '';
     const trunc = (t,n) => t && t.length>n ? t.slice(0,n)+'…' : (t||'');
-    const desc  = trunc(r.descripcion, 70);
-    const comt  = trunc(r.comentarios, 60);
-    const iss   = trunc(r.issue, 60);
-    const acn   = trunc(r.accionCorr, 60);
-    const ano = calcAno(r);
-    const mes = calcMes(r) || '–';
-    const sem = calcSemana(r) || '–';
-    return `<tr style="border-top:1px solid #f1f5f9;">
+    const desc = trunc(r.descripcion, 70);
+    const comt = trunc(r.comentarios, 60);
+    const iss  = trunc(r.issue, 60);
+    const acn  = trunc(r.accionCorr, 60);
+    const ano  = calcAno(r);
+    const mes  = calcMes(r) || '–';
+    const sem  = calcSemana(r) || '–';
+    return `<tr id="ci-row-${idx}" style="border-top:1px solid #f1f5f9;cursor:pointer;" onclick="ciSelectRow(${idx})">
       <td style="padding:10px;${R}color:#9ca3af;font-family:monospace;font-size:12px;">${r.id}</td>
       <td style="padding:10px;${R}font-size:12px;font-weight:600;color:${ano==='Abierto'?'#c2410c':'#1e3a8a'};">${ano}</td>
       <td style="padding:10px;${R}font-weight:600;">${r.sup}</td>
@@ -648,18 +675,26 @@ function renderTable() {
       <td style="padding:10px;${R}font-size:12px;">${r.cuenta}</td>
       <td style="padding:10px;${R}font-size:12px;" title="${r.descripcion.replace(/"/g,'&quot;')}">${desc}</td>
       <td style="padding:10px;${R}font-size:12px;" title="${(r.comentarios||'').replace(/"/g,'&quot;')}">${comt||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;" title="${(r.issue||'').replace(/"/g,'&quot;')}">${iss||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;" title="${(r.accionCorr||'').replace(/"/g,'&quot;')}">${acn||'–'}</td>
+      ${colVisible.issue      ? `<td style="padding:10px;${R}font-size:12px;" title="${(r.issue||'').replace(/"/g,'&quot;')}">${iss||'–'}</td>`      : ''}
+      ${colVisible.accionCorr ? `<td style="padding:10px;${R}font-size:12px;" title="${(r.accionCorr||'').replace(/"/g,'&quot;')}">${acn||'–'}</td>` : ''}
       <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapEntregado||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapAprob||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;">${r.sopPlaneado||'–'}</td>
       <td style="padding:10px;${R}font-size:12px;">${r.sopReal||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;text-align:center;">${mes}</td>
-      <td style="padding:10px;${R}font-size:12px;text-align:center;">${sem}</td>
-      <td style="padding:10px;${R}">${badge(s)}</td>
-      ${readOnly ? '' : `<td style="padding:10px;${R}white-space:nowrap;"><button onclick="openModal(${r.id})" class="btn-e">Editar</button>&nbsp;<button onclick="deleteRecord(${r.id})" class="btn-d">Eliminar</button></td>`}
+      ${colVisible.mes    ? `<td style="padding:10px;${R}font-size:12px;text-align:center;">${mes}</td>`  : ''}
+      ${colVisible.semana ? `<td style="padding:10px;${R}font-size:12px;text-align:center;">${sem}</td>` : ''}
+      ${colVisible.estatus? `<td style="padding:10px;${R}">${badge(s)}</td>`                              : ''}
+      ${readOnly ? '' : `<td style="padding:10px;${R}white-space:nowrap;" onclick="event.stopPropagation()"><button onclick="openModal(${r.id})" class="btn-e">Editar</button>&nbsp;<button onclick="deleteRecord(${r.id})" class="btn-d">Eliminar</button></td>`}
     </tr>`;
   }).join('');
+}
+
+function ciSelectRow(idx) {
+  const prev = document.getElementById('ci-row-'+ciSelectedRow);
+  if (prev) prev.classList.remove('ci-row-focus');
+  ciSelectedRow = (ciSelectedRow === idx) ? -1 : idx;
+  const next = document.getElementById('ci-row-'+ciSelectedRow);
+  if (next) { next.classList.add('ci-row-focus'); next.scrollIntoView({block:'nearest'}); }
 }
 
 // ── CRUD (Firestore)
@@ -707,31 +742,44 @@ async function deleteRecord(id) {
 function renderAttendance() {
   const head = document.getElementById('att-head');
   const body = document.getElementById('att-body');
+
+  // Populate dept filter dropdown
+  const deptSel = document.getElementById('att-dept-filter');
+  if (deptSel) {
+    const depts = [...new Set(people.map(p=>p.dept||'').filter(Boolean))].sort();
+    const curVal = deptSel.value;
+    deptSel.innerHTML = '<option value="">Todos los departamentos</option>' +
+      depts.map(d=>`<option value="${d}"${d===curVal?' selected':''}>${d}</option>`).join('');
+  }
+
+  const visiblePeople = attDeptFilter ? people.filter(p=>p.dept===attDeptFilter) : people;
+
   head.innerHTML = `<tr style="background:#1e3a8a;color:white;text-align:center;">
     <th style="padding:12px 14px;text-align:left;position:sticky;left:0;background:#1e3a8a;min-width:160px;z-index:2;">Departamento</th>
-    <th style="padding:12px 14px;text-align:left;position:sticky;left:160px;background:#1e3a8a;min-width:160px;z-index:2;">Persona</th>
+    <th style="padding:12px 14px;text-align:left;position:sticky;left:160px;background:#1e3a8a;min-width:160px;z-index:2;">Responsable</th>
     ${meetingDates.map(d => {
       const dt = new Date(d+'T12:00:00');
       const lbl = dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});
-      const cnt = people.filter(p=>p.attendance&&p.attendance[d]===1).length;
+      const cnt = visiblePeople.filter(p=>p.attendance&&p.attendance[d]===1).length;
       return `<th style="padding:8px 6px;min-width:80px;">
         <div style="font-size:12px;font-weight:700;">${lbl}</div>
-        <div style="color:#93c5fd;font-size:11px;">${cnt}/${people.length} ✓</div>
+        <div style="color:#93c5fd;font-size:11px;">${cnt}/${visiblePeople.length} ✓</div>
         <button onclick="removeMeeting('${d}')" title="Eliminar fecha" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:10px;margin-top:2px;">✕ quitar</button>
       </th>`;
     }).join('')}
     <th style="padding:12px 8px;min-width:70px;">Total</th>
   </tr>`;
 
-  body.innerHTML = people.map((p,pi) => {
+  body.innerHTML = visiblePeople.map((p, vi) => {
+    const globalIdx = people.indexOf(p);
     const total = meetingDates.filter(d=>p.attendance&&p.attendance[d]===1).length;
-    const bg = pi%2===0?'white':'#f8fafc';
+    const bg = vi%2===0?'white':'#f8fafc';
     return `<tr style="border-top:1px solid #f1f5f9;background:${bg};">
       <td style="padding:10px 14px;font-weight:600;font-size:13px;color:#4b5563;position:sticky;left:0;background:${bg};z-index:1;">${p.dept||''}</td>
       <td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:160px;background:${bg};z-index:1;">${p.name}</td>
       ${meetingDates.map(d => {
         const v = p.attendance?.[d];
-        const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${pi})"`;
+        const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${globalIdx})"`;
         if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes"${tgl}>&#10003;</div></td>`;
         if (v===0) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-no"${tgl}>&#10007;</div></td>`;
         return `<td style="padding:6px;text-align:center;"><div class="att-cell att-na"${tgl}>–</div></td>`;
@@ -1542,6 +1590,43 @@ async function init() {
 
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
 document.getElementById('login-pw').focus();
+
+document.addEventListener('keydown', e => {
+  const inInput = ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName);
+  const searchEl = document.getElementById('f-search');
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    if (currentTab === 'ci') { e.preventDefault(); searchEl.focus(); searchEl.select(); }
+    return;
+  }
+  if (e.key === '/' && !inInput && currentTab === 'ci') {
+    e.preventDefault(); searchEl.focus(); searchEl.select(); return;
+  }
+  if (e.key === 'Escape') {
+    if (document.getElementById('modal').style.display !== 'none') { closeModal(); return; }
+    if (document.activeElement === searchEl) { searchEl.blur(); }
+    if (ciSelectedRow >= 0) { ciSelectRow(ciSelectedRow); }
+    return;
+  }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && currentTab === 'ci') {
+    if (!ciFilteredRows.length) return;
+    e.preventDefault();
+    const prev = document.getElementById('ci-row-'+ciSelectedRow);
+    if (prev) prev.classList.remove('ci-row-focus');
+    if (e.key === 'ArrowDown') {
+      ciSelectedRow = ciSelectedRow < ciFilteredRows.length - 1 ? ciSelectedRow + 1 : 0;
+    } else {
+      ciSelectedRow = ciSelectedRow > 0 ? ciSelectedRow - 1 : ciFilteredRows.length - 1;
+    }
+    const next = document.getElementById('ci-row-'+ciSelectedRow);
+    if (next) { next.classList.add('ci-row-focus'); next.scrollIntoView({block:'nearest'}); }
+    return;
+  }
+  if (e.key === 'Enter' && currentTab === 'ci' && ciSelectedRow >= 0 && !inInput) {
+    const r = ciFilteredRows[ciSelectedRow];
+    if (r) openModal(r.id);
+    return;
+  }
+});
 </script>
 </body>
 </html>
