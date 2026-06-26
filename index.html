@@ -793,38 +793,65 @@ function renderAttSummary() {
   const el = document.getElementById('att-summary');
   if (!el) return;
 
-  // Flatten multi-dept entries (stored as "DEPT A / DEPT B")
-  const registeredDepts = new Set();
+  // For each department, accumulate required (0 or 1) and absent (0) counts
+  const stats = {}; // dept → { required, absent }
   people.forEach(p => {
-    (p.dept||'').split('/').forEach(d => registeredDepts.add(d.trim().toUpperCase()));
+    const depts = (p.dept||'Sin dept').split('/').map(d => d.trim());
+    depts.forEach(dept => {
+      if (!stats[dept]) stats[dept] = { required: 0, absent: 0 };
+      meetingDates.forEach(d => {
+        const v = p.attendance?.[d];
+        if (v === 1 || v === 0) {
+          stats[dept].required++;
+          if (v === 0) stats[dept].absent++;
+        }
+      });
+    });
   });
 
-  const missing = ALL_DEPTS.filter(d => !registeredDepts.has(d));
-  const present = ALL_DEPTS.filter(d => registeredDepts.has(d));
+  // Only show depts that had at least 1 required attendance
+  const rows = Object.entries(stats)
+    .filter(([, s]) => s.required > 0)
+    .sort((a, b) => b[1].absent - a[1].absent);
+
+  const failing = rows.filter(([, s]) => s.absent > 0);
+  const perfect = rows.filter(([, s]) => s.absent === 0);
 
   el.innerHTML = `
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);padding:16px 20px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <span style="font-size:13px;font-weight:700;color:#1e293b;">Cobertura por Departamento</span>
-        <span style="font-size:12px;color:#6b7280;">${present.length} de ${ALL_DEPTS.length} departamentos registrados
-          ${missing.length ? `· <span style="color:#b91c1c;font-weight:600;">${missing.length} sin participación</span>` : '· <span style="color:#15803d;font-weight:600;">Cobertura completa</span>'}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:13px;font-weight:700;color:#1e293b;">Resumen de Faltas por Departamento</span>
+        <span style="font-size:12px;color:#6b7280;">
+          ${failing.length
+            ? `<span style="color:#b91c1c;font-weight:600;">${failing.length} dept${failing.length>1?'s':''} con faltas</span> · ${perfect.length} sin faltas`
+            : '<span style="color:#15803d;font-weight:600;">Sin faltas registradas</span>'}
         </span>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${ALL_DEPTS.map(d => {
-          const has = registeredDepts.has(d);
-          return `<span style="
-            display:inline-flex;align-items:center;gap:5px;
-            padding:5px 11px;border-radius:6px;font-size:12px;font-weight:600;
-            background:${has ? '#f0fdf4' : '#fef2f2'};
-            color:${has ? '#166534' : '#991b1b'};
-            border:1px solid ${has ? '#bbf7d0' : '#fecaca'};
-          ">
-            <span style="width:7px;height:7px;border-radius:50%;background:${has ? '#16a34a' : '#dc2626'};flex-shrink:0;"></span>
-            ${d}
-          </span>`;
-        }).join('')}
-      </div>
+      ${rows.length === 0
+        ? `<p style="color:#9ca3af;font-size:13px;margin:0;">Sin datos de asistencia registrados aún.</p>`
+        : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+          ${rows.map(([dept, s]) => {
+            const rate = Math.round((s.absent / s.required) * 100);
+            const bad  = s.absent > 0;
+            return `<div style="
+              display:flex;align-items:center;justify-content:space-between;
+              padding:9px 13px;border-radius:8px;
+              background:${bad ? '#fef2f2' : '#f0fdf4'};
+              border:1px solid ${bad ? '#fecaca' : '#bbf7d0'};
+            ">
+              <div>
+                <div style="font-size:12px;font-weight:700;color:${bad ? '#991b1b' : '#166534'};">${dept}</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">${s.absent} falta${s.absent!==1?'s':''} de ${s.required} requerida${s.required!==1?'s':''}</div>
+              </div>
+              <div style="
+                font-size:14px;font-weight:800;
+                color:${bad ? '#b91c1c' : '#15803d'};
+                min-width:36px;text-align:right;
+              ">${bad ? rate+'%' : '✓'}</div>
+            </div>`;
+          }).join('')}
+        </div>`
+      }
     </div>`;
 }
 
