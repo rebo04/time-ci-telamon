@@ -832,22 +832,22 @@ function renderAttSummary() {
         : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
           ${rows.map(([dept, s]) => {
             const rate = Math.round((s.absent / s.required) * 100);
-            const bad  = s.absent > 0;
+            const tier = rate === 0 ? 'ok' : rate <= 30 ? 'warn' : 'bad';
+            const bg    = tier==='ok' ? '#f0fdf4' : tier==='warn' ? '#fefce8' : '#fef2f2';
+            const bdr   = tier==='ok' ? '#bbf7d0' : tier==='warn' ? '#fde68a' : '#fecaca';
+            const clr   = tier==='ok' ? '#166534' : tier==='warn' ? '#92400e' : '#991b1b';
             return `<div style="
               display:flex;align-items:center;justify-content:space-between;
               padding:9px 13px;border-radius:8px;
-              background:${bad ? '#fef2f2' : '#f0fdf4'};
-              border:1px solid ${bad ? '#fecaca' : '#bbf7d0'};
+              background:${bg};border:1px solid ${bdr};
             ">
               <div>
-                <div style="font-size:12px;font-weight:700;color:${bad ? '#991b1b' : '#166534'};">${dept}</div>
+                <div style="font-size:12px;font-weight:700;color:${clr};">${dept}</div>
                 <div style="font-size:11px;color:#6b7280;margin-top:2px;">${s.absent} falta${s.absent!==1?'s':''} de ${s.required} requerida${s.required!==1?'s':''}</div>
               </div>
-              <div style="
-                font-size:14px;font-weight:800;
-                color:${bad ? '#b91c1c' : '#15803d'};
-                min-width:36px;text-align:right;
-              ">${bad ? rate+'%' : '✓'}</div>
+              <div style="font-size:14px;font-weight:800;color:${clr};min-width:36px;text-align:right;">
+                ${tier==='ok' ? '✓' : rate+'%'}
+              </div>
             </div>`;
           }).join('')}
         </div>`
