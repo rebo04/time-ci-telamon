@@ -51,7 +51,6 @@
     .col-toggle-btn{padding:4px 11px;border-radius:6px;border:1.5px solid #d1d5db;background:#f9fafb;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
     .col-toggle-btn.active{background:#1e40af;color:white;border-color:#1e40af}
     .col-toggle-btn:hover:not(.active){background:#eff6ff;border-color:#93c5fd;color:#1e40af}
-    .ci-row-focus>td{background:#dbeafe!important;box-shadow:inset 0 0 0 2px #3b82f6;}
     kbd{background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;padding:1px 5px;font-size:11px;font-family:monospace;}
   </style>
 </head>
@@ -195,9 +194,7 @@
         </select>
       </div>
       <div style="min-width:130px;"><label>Célula</label>
-        <select id="f-cell" onchange="renderTable()">
-          <option value="">Todas</option>
-        </select>
+        <input type="text" id="f-cell" oninput="renderTable()" placeholder="Ej: 114">
       </div>
       <div style="flex:1;min-width:220px;"><label>Buscar</label>
         <input type="text" id="f-search" oninput="renderTable()" placeholder="NP, descripción, cuenta...">
@@ -228,7 +225,7 @@
       <button id="col-btn-semana"     class="col-toggle-btn" onclick="toggleCol('semana')">Semana</button>
       <button id="col-btn-issue"      class="col-toggle-btn" onclick="toggleCol('issue')">Issue</button>
       <button id="col-btn-accionCorr" class="col-toggle-btn" onclick="toggleCol('accionCorr')">Acción Corr.</button>
-      <span style="font-size:12px;color:#9ca3af;margin-left:auto;"><kbd>/</kbd> o <kbd>Ctrl+F</kbd> buscar · <kbd>↑↓</kbd> navegar · <kbd>Enter</kbd> editar · <kbd>Esc</kbd> cerrar</span>
+      <span style="font-size:12px;color:#9ca3af;margin-left:auto;"><kbd>/</kbd> o <kbd>Ctrl+F</kbd> → filtrar por Célula</span>
     </div>
     <div style="background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:auto;">
       <table id="ci-table" style="width:100%;font-size:13px;">
@@ -393,8 +390,6 @@ let currentTimePeriod = 'mes';
 const FIELDS = ['sup','platform','cell','cuenta','npActual','npNuevo','descripcion','comentarios','ppapEntregado','ppapAprob','sopPlaneado','sopReal','issue','accionCorr'];
 let colVisible = { estatus: false, mes: false, semana: false, issue: false, accionCorr: false };
 let attDeptFilter = '';
-let ciSelectedRow = -1;
-let ciFilteredRows = [];
 
 // ── Sync indicator
 function setSyncing(on) {
@@ -597,16 +592,6 @@ function populateYearFilter() {
   sel.innerHTML = '<option value="">Todos</option>' + years.map(y => `<option${y===cur?' selected':''}>${y}</option>`).join('');
 }
 
-function populateCellFilter() {
-  const sel = document.getElementById('f-cell');
-  const cur = sel.value;
-  const cells = [...new Set(records.map(r => r.cell||'').filter(Boolean))].sort((a,b) => {
-    const na = parseInt(a), nb = parseInt(b);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return a.localeCompare(b);
-  });
-  sel.innerHTML = '<option value="">Todas</option>' + cells.map(c => `<option${c===cur?' selected':''}>${c}</option>`).join('');
-}
 
 function getFiltered() {
   const year = document.getElementById('f-year').value;
@@ -620,7 +605,7 @@ function getFiltered() {
     if (sup && r.sup.toLowerCase()!==sup) return false;
     if (plat && r.platform.toLowerCase()!==plat) return false;
     if (status && getStatus(r)!==status) return false;
-    if (cell && (r.cell||'')!==cell) return false;
+    if (cell && !(r.cell||'').toLowerCase().includes(cell.toLowerCase())) return false;
     if (q) {
       const hay=[r.npActual,r.npNuevo,r.descripcion,r.cuenta,r.cell,r.platform,r.sup].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
@@ -630,9 +615,7 @@ function getFiltered() {
 }
 
 function renderTable() {
-  ciFilteredRows = getFiltered();
-  ciSelectedRow = -1;
-  const rows = ciFilteredRows;
+  const rows = getFiltered();
   const tbody = document.getElementById('ci-tbody');
   const thead = document.getElementById('ci-thead');
   document.getElementById('tbl-empty').style.display = rows.length?'none':'';
@@ -664,7 +647,7 @@ function renderTable() {
     const ano  = calcAno(r);
     const mes  = calcMes(r) || '–';
     const sem  = calcSemana(r) || '–';
-    return `<tr id="ci-row-${idx}" style="border-top:1px solid #f1f5f9;cursor:pointer;" onclick="ciSelectRow(${idx})">
+    return `<tr style="border-top:1px solid #f1f5f9;">
       <td style="padding:10px;${R}color:#9ca3af;font-family:monospace;font-size:12px;">${r.id}</td>
       <td style="padding:10px;${R}font-size:12px;font-weight:600;color:${ano==='Abierto'?'#c2410c':'#1e3a8a'};">${ano}</td>
       <td style="padding:10px;${R}font-weight:600;">${r.sup}</td>
@@ -687,14 +670,6 @@ function renderTable() {
       ${readOnly ? '' : `<td style="padding:10px;${R}white-space:nowrap;" onclick="event.stopPropagation()"><button onclick="openModal(${r.id})" class="btn-e">Editar</button>&nbsp;<button onclick="deleteRecord(${r.id})" class="btn-d">Eliminar</button></td>`}
     </tr>`;
   }).join('');
-}
-
-function ciSelectRow(idx) {
-  const prev = document.getElementById('ci-row-'+ciSelectedRow);
-  if (prev) prev.classList.remove('ci-row-focus');
-  ciSelectedRow = (ciSelectedRow === idx) ? -1 : idx;
-  const next = document.getElementById('ci-row-'+ciSelectedRow);
-  if (next) { next.classList.add('ci-row-focus'); next.scrollIntoView({block:'nearest'}); }
 }
 
 // ── CRUD (Firestore)
@@ -1548,7 +1523,6 @@ function initListeners() {
     records = snap.docs.map(d => ({...d.data(), _docId: d.id}));
     records.sort((a,b) => (a.id||0)-(b.id||0));
     populateYearFilter();
-    populateCellFilter();
     if (currentTab==='dashboard') renderDashboard();
     if (currentTab==='ci') renderTable();
     if (currentTab==='resumen') renderResumen();
@@ -1593,37 +1567,17 @@ document.getElementById('login-pw').focus();
 
 document.addEventListener('keydown', e => {
   const inInput = ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName);
-  const searchEl = document.getElementById('f-search');
+  const cellEl = document.getElementById('f-cell');
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-    if (currentTab === 'ci') { e.preventDefault(); searchEl.focus(); searchEl.select(); }
+    if (currentTab === 'ci') { e.preventDefault(); cellEl.focus(); }
     return;
   }
   if (e.key === '/' && !inInput && currentTab === 'ci') {
-    e.preventDefault(); searchEl.focus(); searchEl.select(); return;
+    e.preventDefault(); cellEl.focus(); return;
   }
   if (e.key === 'Escape') {
     if (document.getElementById('modal').style.display !== 'none') { closeModal(); return; }
-    if (document.activeElement === searchEl) { searchEl.blur(); }
-    if (ciSelectedRow >= 0) { ciSelectRow(ciSelectedRow); }
-    return;
-  }
-  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && currentTab === 'ci') {
-    if (!ciFilteredRows.length) return;
-    e.preventDefault();
-    const prev = document.getElementById('ci-row-'+ciSelectedRow);
-    if (prev) prev.classList.remove('ci-row-focus');
-    if (e.key === 'ArrowDown') {
-      ciSelectedRow = ciSelectedRow < ciFilteredRows.length - 1 ? ciSelectedRow + 1 : 0;
-    } else {
-      ciSelectedRow = ciSelectedRow > 0 ? ciSelectedRow - 1 : ciFilteredRows.length - 1;
-    }
-    const next = document.getElementById('ci-row-'+ciSelectedRow);
-    if (next) { next.classList.add('ci-row-focus'); next.scrollIntoView({block:'nearest'}); }
-    return;
-  }
-  if (e.key === 'Enter' && currentTab === 'ci' && ciSelectedRow >= 0 && !inInput) {
-    const r = ciFilteredRows[ciSelectedRow];
-    if (r) openModal(r.id);
+    if (document.activeElement === cellEl) { cellEl.blur(); }
     return;
   }
 });
