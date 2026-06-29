@@ -395,6 +395,24 @@
   </div>
 </div>
 
+<!-- MODAL: TIS-F0788 -->
+<div id="modal-tis" class="modal-ov" style="display:none;">
+  <div id="tis-inner" style="background:white;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:1060px;max-height:94vh;overflow-y:auto;margin:16px;position:relative;">
+    <div style="background:#1e3a8a;color:white;padding:14px 22px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:#93c5fd;text-transform:uppercase;">TIS-F0788</div>
+        <h2 id="tis-title" style="font-size:16px;font-weight:800;margin:2px 0 0;"></h2>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button id="tis-export-btn" onclick="exportTIS(currentTISId)" style="background:#f59e0b;color:white;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;">Exportar a Excel</button>
+        <button onclick="closeTIS()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;font-weight:700;line-height:1;padding:0 4px;">&#x2715;</button>
+      </div>
+    </div>
+    <div id="tis-content"></div>
+    <div style="padding:6px 24px 12px;text-align:right;font-size:10px;color:#9ca3af;">Created by Arturo Rebolledo</div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════
 // LOGIN
@@ -722,7 +740,7 @@ function renderTable() {
     const ano  = calcAno(r);
     const mes  = calcMes(r) || '–';
     const sem  = calcSemana(r) || '–';
-    return `<tr style="border-top:1px solid #f1f5f9;">
+    return `<tr style="border-top:1px solid #f1f5f9;cursor:pointer;" onclick="openTIS(${r.id})" title="Ver TIS-F0788">
       <td style="padding:10px;${R}color:#9ca3af;font-family:monospace;font-size:12px;">${r.id}</td>
       <td style="padding:10px;${R}font-size:12px;font-weight:600;color:${ano==='Abierto'?'#c2410c':'#1e3a8a'};">${ano}</td>
       <td style="padding:10px;${R}font-weight:600;">${r.sup}</td>
@@ -1719,8 +1737,441 @@ async function init() {
   }
 }
 
+// ═══════════════════════════════════════════════════
+// TIS-F0788 — Engineering Changes Tracker (per CI)
+// ═══════════════════════════════════════════════════
+let currentTISId = null;
+const _nb = '        '; // 8 non-breaking spaces for sub-item indent
+
+// Datos exactos del Excel TIS-F0788 — no modificar texto
+const TIS_ACTIVITIES = [
+  {t:'r',b:'Arranque en Telamon',c:'Todos',d:null,f:false},
+  {t:'r',b:'NJN  disponible',c:'PM',d:null,f:true},
+  {t:'r',b:'Planos disponibles',c:'PM',d:null,f:false},
+  {t:'r',b:'Asegurar el cambio en Oracle',c:'INGENIERIA  Daiton',d:'Carmen/Brandy',f:true},
+  {t:'r',b:'Fecha efectiva en Oracle',c:'Ingenieria',d:'Ingeniero/Carmen',f:false},
+  {t:'r',b:'Fecha de Aprobación de PPAP',c:'CALIDAD',d:'Daniela/Angel',f:false},
+  {t:'r',b:'BOM Actualizado',c:'INGENIERIA  Daiton',d:'Carmen/ Branady',f:true},
+  {t:'r',b:'Revisar si aplica actualización del PFMEA. ',c:'INGENIERIA',d:'Jose Velazquez',f:true},
+  {t:'r',b:'ADW en carpeta ',c:'INGENIERIA',d:null,f:false},
+  {t:'s',b:'MATERIALES'},
+  {t:'r',b:'Fechas de break point por parte de materiales.',c:'MATERIALES',d:'Carmen Solis',f:true},
+  {t:'r',b:'Disponibilidad de materia prima.',c:'MATERIALES',d:'Carmen Solis',f:true},
+  {t:'r',b:'Locación en almacén. El material debera  tener localizaciones separadas en almacen cuando tengan componentes similares ',c:'MATERIALES',d:'Carmen Solis/Arturo',f:true},
+  {t:'r',b:'Cuando se involucren componentes similares toda la materia prima debe pasar por Incoming hasta que el cambio sea completamente implementado para evitar mezcla entre componentes.',c:'CALIDAD',d:'Araceli',f:true},
+  {t:'r',b:'Inventario de material obsoleto.',c:'MATERIALES',d:'Carmen Solis',f:true},
+  {t:'r',b:'Segregación de material obsoleto.',c:'MATERIALES',d:'Carmen Solis',f:true},
+  {t:'r',b:'Disposición de materia prima obsoleta.',c:'MATERIALES',d:'Carmen Solis',f:true},
+  {t:'r',b:'Mascara de Impresion de barcode',c:'MATERIALES',d:'Antonio',f:true},
+  {t:'r',b:'Barcode  liberado contra TIS-F0841 - Formato Cambio De Revisión De Barcode',c:'CALIDAD',d:'Ilse',f:true},
+  {t:'r',b:'Barcode disponible y Etiqueta',c:'ETIQUETAS',d:'Kevin',f:true},
+  {t:'r',b:'Fechas de break point Producto Terminado',c:'PLANEACION',d:'Octavio Alcal',f:true},
+  {t:'r',b:'Inventario de material PRODUCTO TERMINADO     (Celda de Manufactura, area de Mateial sospechoso, )',c:'MANUFACTURA',d:'LEONARDO/ FELIPE',f:true},
+  {t:'r',b:'Inventario de material PRODUCTO TERMINADO',c:'CS',d:'ALEX BERNAL',f:true},
+  {t:'r',b:'Disposición de materia procducto Terminado',c:'EMBARQUES',d:'BLANCA',f:false},
+  {t:'s',b:'INGENIERIA CORTE Y SLP'},
+  {t:'r',b:'Inventario de material obsoleto.',c:'Corte/SLP/ Ingenieria',d:'J Gurrola/Vladimir',f:false},
+  {t:'r',b:'Segregación de material obsoleto.',c:'Corte / SLP',d:'J Gurrola/Vladimir',f:true},
+  {t:'r',b:'Disposición de materia prima obsoleta.',c:'SLP',d:'Carmen Solis',f:true},
+  {t:'r',b:'Asegurar sistema en Corte',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+'Secuencia y cargas de maquinas',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+' Localización en el rack.',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+' CAO, configuracion de cable',c:'INGENIERIA DE CORTE',d:'Vlaimir',f:true},
+  {t:'r',b:'-'+_nb+' WARE HOUSE,  localizacion en sistema',c:'INGENIERIA DE CORTE',d:'Vladimir',f:false},
+  {t:'r',b:'-'+_nb+' Disponibilidad de equipo/herramienta',c:'INGENIERIA DE CORTE',d:'Vladimir ',f:true},
+  {t:'r',b:'Asegurar sistema en SLP',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+'Secuencia y cargas de maquinas',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+' Localización en el rack.',c:'INGENIERIA DE CORTE',d:'Vladimir',f:true},
+  {t:'r',b:'-'+_nb+'  MAPA',c:'INGENIERIA DE CORTE',d:'Vlaimir',f:true},
+  {t:'r',b:'-'+_nb+' Diagrama de splice',c:'INGENIERIA DE CORTE',d:'Vladimir',f:false},
+  {t:'r',b:'-'+_nb+' Primer Articulo',c:'INGENIERIA DE CORTE',d:'Vladimir ',f:true},
+  {t:'r',b:'-'+_nb+' Change OVER',c:'INGENIERIA DE CORTE',d:'Vladimir ',f:true},
+  {t:'r',b:'-'+_nb+' Disponibilidad de equipo/herramienta',c:'INGENIERIA DE CORTE',d:'Vladimir ',f:true},
+  {t:'s',b:'INGENIERIA EF'},
+  {t:'r',b:'Disponibilidad de herramienta (tableros , patienta )',c:'DISEÑO',d:'Luis C',f:false},
+  {t:'r',b:'Tableros y Herramienta con el cambio ',c:'DISEÑO',d:'Luis C',f:false},
+  {t:'r',b:'Herramienta (Liberada) - Cambio de Ingenieria',c:'CALIDAD/ IINGENIERIA',d:'Dany/Abel',f:false},
+  {t:'r',b:'Herramienta (Liberada) -Incremento de Volumen',c:'CALIDAD',d:'NA',f:false},
+  {t:'r',b:'Papelería.',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' Line leader.',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' Changeover',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' Tester verification',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' First article (manufactura y calidad)',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'Ayudas visuales de cable  y/o emplames  actulizadas ',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' Plano con la nueva revisión. Entregar a primeros artículos.',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'-'+_nb+' Training chart.',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'Herramienta disponible.',c:'INGENIERIA',d:null,f:true},
+  {t:'r',b:'Pistolas de Corbatas contienen Numero EID ',c:'INGENIERIA',d:null,f:false},
+  {t:'r',b:'Pistolas de corbatas  Calibradas',c:'CALIDAD',d:null,f:false},
+  {t:'r',b:'Actualizacion de revision en tester PLC',c:'PLC',d:null,f:true},
+  {t:'r',b:'Disponibilidad de barcode en revisión nueva. Etiqueta de ensamble final con nueva revisión disponible.',c:'ETIQUETAS',d:null,f:true},
+  {t:'r',b:'Calibración de tester.',c:'CALIDAD',d:'Dani G',f:true},
+  {t:'r',b:'Comunicación a manufactura del cambio, con lista de entrenamiento fecha definida y descripción visual del cambio.',c:'MANUFACTURA',d:'Ivan Macias',f:true},
+  {t:'r',b:'Kanban actualizadas y Surtido de materia prima a la línea.',c:'MATERIALES/ CORTE DE CABLE ',d:'Jessi/ Arturo',f:true},
+  {t:'r',b:'Liberación de línea.',c:'CALIDAD',d:'Dani G',f:true},
+  {t:'r',b:'Notificar a contención de los cambios de ingeniería.',c:'MANUFACURA ',d:'Ivan Macias',f:true},
+  {t:'r',b:'Creación de TAC para contención.',c:'CALIDAD',d:'NA',f:true},
+  {t:'r',b:'Verificacion de 7187-2698 Para prevencion de riezgos en procesos nuevos ',c:'INGENIERIA ',d:'Dueno del Cambio',f:true},
+];
+
+const TIS_NOTIFICATIONS = [
+  {role:'Supervisores de Mejora continua.',name:'Iva Garcia'},
+  {role:'Supervisores del Area de Corte',name:'Jose Gurrola'},
+  {role:'Supervisores de Manufactura ',name:'Ivan Macias'},
+  {role:'Gerente de Mantenimiento',name:'Francisco Gallegos'},
+  {role:'Supervisores de Ingenieria',name:'Gabriela Moreno'},
+  {role:'Supervisor de Materiales ',name:'Antonio Banuelos'},
+  {role:'Gerente de Ingeniería ',name:'Octavio Meza'},
+  {role:'Ingenieros de Calidad',name:'Daniela Gamez'},
+  {role:'Gerentes de Manufactura',name:'Leonardo'},
+  {role:'Gerente Corte de Cable ',name:'Jose Gurrola'},
+  {role:'Gerente de Materiales',name:'Carlo Lopez'},
+  {role:'Gerente de Calidad',name:'Marco Montellano'},
+  {role:'Etiquetas',name:'Blanca Alvarez'},
+  {role:'Supervisor de contencion',name:'Arturo Rodriguez'},
+];
+
+function openTIS(id) {
+  currentTISId = id;
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('tis-title').textContent =
+    'CI #' + r.id + ' — ' + (r.npActual||'') + (r.npNuevo ? ' → ' + r.npNuevo : '');
+  document.getElementById('tis-content').innerHTML = buildTISHTML(r);
+  document.getElementById('tis-inner').scrollTop = 0;
+  document.getElementById('modal-tis').style.display = 'flex';
+}
+
+function closeTIS() {
+  document.getElementById('modal-tis').style.display = 'none';
+}
+
+function buildTISHTML(r) {
+  const S = s => (s||'').toString()
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const bdr = 'border:1px solid #e2e8f0;';
+  const pad = 'padding:5px 8px;';
+  const fn  = 'font-size:12px;';
+  const pw  = 'white-space:pre-wrap;';
+
+  // Header section
+  const hdrRows = [
+    ['INGENIERO RESPONSABLE', r.sup],
+    ['CLIENTE',               r.platform],
+    ['PROGRAMA',              r.cuenta],
+    ['CELULA',                r.cell],
+    ['TIPO DE CAMBIO',        ''],
+    ['NUMERO DE PARTE',       (r.npActual||'') + (r.npNuevo ? ' → ' + r.npNuevo : '')],
+  ].map(([lbl,val]) =>
+    `<tr><td style="${bdr}${pad}${fn}font-weight:700;background:#f1f5f9;white-space:nowrap;width:200px;">${lbl}</td>`+
+    `<td style="${bdr}${pad}${fn}${pw}">${S(val)}</td></tr>`
+  ).join('');
+
+  const hdr = `
+  <div style="padding:20px 24px 12px;">
+    <div style="border:2px solid #1e3a8a;border-radius:6px;overflow:hidden;">
+      <div style="background:#1e3a8a;color:white;padding:9px 14px;font-weight:800;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
+        <span>TIS-F0788 – Engineering Changes Tracker</span>
+        <span style="font-size:11px;font-weight:400;color:#93c5fd;">Update:</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">${hdrRows}</table>
+      <div style="${bdr}${pad}font-weight:700;font-size:11px;background:#f1f5f9;color:#374151;letter-spacing:.04em;">DESCRIPCION DEL CAMBIO</div>
+      <div style="${bdr}padding:8px;${fn}${pw}min-height:36px;">${S(r.descripcion)}</div>
+      <div style="${bdr}${pad}font-weight:700;font-size:11px;background:#f1f5f9;color:#374151;letter-spacing:.04em;">COMENTARIOS</div>
+      <div style="${bdr}padding:8px;${fn}${pw}min-height:28px;">${S(r.comentarios)}</div>
+    </div>
+  </div>`;
+
+  // Activities table
+  let actRows = '';
+  TIS_ACTIVITIES.forEach((act, idx) => {
+    if (act.t === 's') {
+      actRows += `<tr style="background:#374151;"><td style="${bdr}${pad}"></td>`+
+        `<td colspan="5" style="${bdr}${pad}font-weight:800;font-size:11px;color:white;letter-spacing:.5px;">${S(act.b)}</td></tr>`;
+    } else {
+      const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
+      actRows += `<tr style="background:${bg};">`+
+        `<td style="${bdr}${pad}width:22px;"></td>`+
+        `<td style="${bdr}${pad}${fn}${pw}">${S(act.b)}</td>`+
+        `<td style="${bdr}${pad}${fn}${pw}">${S(act.c)}</td>`+
+        `<td style="${bdr}${pad}${fn}${pw}">${S(act.d)}</td>`+
+        `<td style="${bdr}${pad}${fn}min-width:86px;color:#d1d5db;text-align:center;font-size:10px;">—</td>`+
+        `<td style="${bdr}${pad}${fn}min-width:86px;color:#d1d5db;text-align:center;font-size:10px;">—</td>`+
+        `</tr>`;
+    }
+  });
+
+  const acts = `
+  <div style="padding:0 24px 12px;overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;min-width:700px;">
+      <thead><tr style="background:#1e3a8a;color:white;">
+        <th style="${bdr}${pad}width:22px;"></th>
+        <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:280px;">ACTIVIDADES</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:150px;">DEPARTAMENTO</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:120px;">RESPONSABLE</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:86px;">FECHA PLANEADA</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:86px;">FECHA REAL</th>
+      </tr></thead>
+      <tbody>${actRows}</tbody>
+    </table>
+  </div>`;
+
+  // Notes
+  const notes = `
+  <div style="padding:0 24px 12px;">
+    <div style="border:1px solid #fcd34d;border-radius:4px;padding:10px 14px;background:#fffbeb;font-size:12px;">
+      <strong>Nota:</strong><br>
+      Todo el material sin aprobacion PPAP debe estar resguardado en la jaula de calidad.<br>
+      Se revisa la matriz de componentes similares, con el fin de evaluar si se aplican números de parte que presenten riesgo de mezcla o confusión
+    </div>
+  </div>`;
+
+  // Notification section
+  const notifRows = TIS_NOTIFICATIONS.map((n, i) =>
+    `<tr style="background:${i%2===0?'#f8fafc':'#fff'};">`+
+    `<td style="${bdr}${pad}${fn}">${S(n.role)}</td>`+
+    `<td style="${bdr}${pad}${fn}">${S(n.name)}</td></tr>`
+  ).join('');
+
+  const notif = `
+  <div style="padding:0 24px 20px;">
+    <div style="border:2px solid #1e3a8a;border-radius:6px;overflow:hidden;">
+      <div style="background:#1e3a8a;color:white;padding:8px 14px;font-weight:800;font-size:13px;">NOTIFICACIÓN DE CAMBIO DE INGENIERIA</div>
+      <div style="padding:8px 14px;${fn}background:#f8fafc;border-bottom:1px solid #e2e8f0;"><strong>A=ADD &nbsp;&nbsp; C=CHANGE</strong></div>
+      <div style="padding:10px 14px;${fn}border-bottom:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div><strong>Número de Parte:</strong> ${S(r.npActual)}</div>
+        <div><strong>Cliente:</strong> ${S(r.platform)}</div>
+        <div><strong>Rev. Anterior</strong></div>
+        <div><strong>Nueva Rev.</strong></div>
+        <div style="grid-column:span 2;"><strong>Descripción del Cambio:</strong> ${S(r.descripcion)}</div>
+        <div><strong>Fecha de Implementacion:</strong> ${S(r.sopPlaneado)||'–'}</div>
+      </div>
+      <div style="padding:5px 14px;font-weight:700;font-size:11px;color:#374151;background:#f1f5f9;border-bottom:1px solid #e2e8f0;letter-spacing:.04em;">Requiere Notificación:</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#374151;color:white;">
+          <th style="${bdr}${pad}font-size:11px;text-align:left;">Área / Rol</th>
+          <th style="${bdr}${pad}font-size:11px;text-align:left;">Responsable</th>
+        </tr></thead>
+        <tbody>${notifRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  return hdr + acts + notes + notif;
+}
+
+async function exportTIS(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  const btn = document.getElementById('tis-export-btn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Arturo Rebolledo'; wb.created = new Date();
+
+    const ws = wb.addWorksheet('HOJA 1');
+    ws.columns = [
+      {width:30},{width:60},{width:25},{width:20},{width:15},{width:15},{width:12}
+    ];
+
+    const BLU='FF1E3A8A', GRAY='FF374151', LGR='FFF1F5F9', WHT='FFFFFFFF', ALT='FFF8FAFC';
+    const tb = (s='thin') => ({style:s,color:{argb:'FFE2E8F0'}});
+    const bAll = {top:tb(),left:tb(),bottom:tb(),right:tb()};
+    const fill = argb => ({type:'pattern',pattern:'solid',fgColor:{argb}});
+
+    // Row 1 — title
+    ws.mergeCells('A1:G1');
+    const r1c = ws.getCell('A1');
+    r1c.value = 'TIS-F0788 – Engineering Changes Tracker';
+    r1c.font = {bold:true,size:14,color:{argb:WHT}};
+    r1c.fill = fill(BLU);
+    r1c.alignment = {horizontal:'center',vertical:'middle'};
+    ws.getRow(1).height = 30;
+
+    // Row 2 — Update label
+    ws.getCell('D2').value = 'Update:';
+    ws.getCell('D2').font = {bold:true,size:10,color:{argb:'FF6B7280'}};
+    ws.getRow(2).height = 14;
+
+    // Rows 3-8 — header fields
+    [
+      {lbl:'INGENIERO RESPONSABLE',val:r.sup||''},
+      {lbl:'CLIENTE',              val:r.platform||''},
+      {lbl:'PROGRAMA',             val:r.cuenta||''},
+      {lbl:'CELULA',               val:r.cell||''},
+      {lbl:'TIPO DE CAMBIO',       val:''},
+      {lbl:'NUMERO DE PARTE',      val:(r.npActual||'')+(r.npNuevo?' → '+r.npNuevo:'')},
+    ].forEach(({lbl,val},i) => {
+      const rn = i+3;
+      ws.mergeCells(`B${rn}:G${rn}`);
+      const la = ws.getCell(`A${rn}`);
+      la.value=lbl; la.font={bold:true,size:10}; la.fill=fill(LGR); la.border=bAll;
+      la.alignment={vertical:'middle'};
+      const va = ws.getCell(`B${rn}`);
+      va.value=val; va.font={size:11}; va.border=bAll;
+      va.alignment={vertical:'middle',wrapText:true};
+      ws.getRow(rn).height=18;
+    });
+    for(let i=9;i<=13;i++) ws.getRow(i).height=10;
+
+    // Row 14 — DESCRIPCION header
+    ws.mergeCells('A14:G14');
+    const d14=ws.getCell('A14');
+    d14.value='DESCRIPCION DEL CAMBIO'; d14.font={bold:true,size:10};
+    d14.fill=fill(LGR); d14.border=bAll; d14.alignment={vertical:'middle'};
+    ws.getRow(14).height=16;
+
+    // Rows 15-18 — description
+    ws.mergeCells('A15:G18');
+    const d15=ws.getCell('A15');
+    d15.value=r.descripcion||''; d15.font={size:10};
+    d15.border=bAll; d15.alignment={vertical:'top',wrapText:true};
+    for(let i=15;i<=18;i++) ws.getRow(i).height=20;
+
+    // Row 19 — COMENTARIOS header
+    ws.mergeCells('A19:G19');
+    const c19=ws.getCell('A19');
+    c19.value='COMENTARIOS'; c19.font={bold:true,size:10};
+    c19.fill=fill(LGR); c19.border=bAll; c19.alignment={vertical:'middle'};
+    ws.getRow(19).height=16;
+
+    // Rows 20-22 — comments
+    ws.mergeCells('A20:G22');
+    const c20=ws.getCell('A20');
+    c20.value=r.comentarios||''; c20.font={size:10};
+    c20.border=bAll; c20.alignment={vertical:'top',wrapText:true};
+    for(let i=20;i<=22;i++) ws.getRow(i).height=18;
+
+    // Row 23 — activities header
+    ['','ACTIVIDADES','DEPARTAMENTO','RESPONSABLE','FECHA PLANEADA','FECHA REAL','ON TIME']
+      .forEach((h,ci)=>{
+        const c=ws.getCell(23,ci+1);
+        c.value=h; c.font={bold:true,size:10,color:{argb:WHT}};
+        c.fill=fill(BLU);
+        c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+        c.border={top:tb('medium'),bottom:tb('medium'),left:tb(),right:tb()};
+      });
+    ws.getRow(23).height=22;
+
+    // Rows 24-90 — activities (TIS_ACTIVITIES index 0..66)
+    TIS_ACTIVITIES.forEach((act,i)=>{
+      const rn=24+i;
+      ws.getRow(rn).height=18;
+      if(act.t==='s'){
+        ws.mergeCells(`B${rn}:G${rn}`);
+        const sc=ws.getCell(`B${rn}`);
+        sc.value=act.b; sc.font={bold:true,size:10,color:{argb:WHT}};
+        sc.fill=fill(GRAY); sc.alignment={vertical:'middle'};
+        ws.getCell(`A${rn}`).fill=fill(GRAY);
+      } else {
+        const bg=i%2===0?ALT:WHT;
+        ['A','B','C','D','E','F','G'].forEach(col=>{
+          const c=ws.getCell(`${col}${rn}`);
+          c.fill=fill(bg); c.border=bAll; c.font={size:10};
+          c.alignment={vertical:'middle',wrapText:true};
+        });
+        ws.getCell(`B${rn}`).value=act.b||'';
+        ws.getCell(`C${rn}`).value=act.c||'';
+        ws.getCell(`D${rn}`).value=act.d||'';
+        if(act.f){
+          ws.getCell(`G${rn}`).value={
+            formula:`IF(AND(ISNUMBER(E${rn}),ISNUMBER(F${rn})),INT((F${rn}-E${rn})/7)*5+IF(WEEKDAY(F${rn})-MOD(F${rn}-E${rn},7)<1,MOD(F${rn}-E${rn},7)-2,MOD(F${rn}-E${rn},7)),"")`
+          };
+          ws.getCell(`G${rn}`).alignment={horizontal:'center',vertical:'middle'};
+        }
+      }
+    });
+
+    // Rows 91-92 — spacers
+    ws.getRow(91).height=10; ws.getRow(92).height=10;
+
+    // Row 93-95 — Notes
+    ws.getCell('B93').value='Nota:';
+    ws.getCell('B93').font={bold:true,size:10}; ws.getRow(93).height=14;
+    ws.mergeCells('B94:G94');
+    ws.getCell('B94').value='Todo el material sin aprobacion PPAP debe estar resguardado en la jaula de calidad.';
+    ws.getCell('B94').font={size:10}; ws.getCell('B94').alignment={wrapText:true};
+    ws.getRow(94).height=14;
+    ws.mergeCells('B95:G95');
+    ws.getCell('B95').value='Se revisa la matriz de componentes similares, con el fin de evaluar si se aplican números de parte que presenten riesgo de mezcla o confusión';
+    ws.getCell('B95').font={size:10}; ws.getCell('B95').alignment={wrapText:true};
+    ws.getRow(95).height=18;
+    ws.getRow(96).height=10;
+
+    // Row 97 — NOTIFICACIÓN header
+    ws.mergeCells('A97:G97');
+    const n97=ws.getCell('A97');
+    n97.value='NOTIFICACIÓN DE CAMBIO DE INGENIERIA';
+    n97.font={bold:true,size:13,color:{argb:WHT}};
+    n97.fill=fill(BLU); n97.alignment={horizontal:'center',vertical:'middle'};
+    ws.getRow(97).height=26;
+
+    // Rows 98-99 — A=ADD / C=CHANGE
+    ws.getCell('A98').value='A=ADD'; ws.getCell('A98').font={bold:true,size:10}; ws.getRow(98).height=14;
+    ws.getCell('A99').value='C=CHANGE'; ws.getCell('A99').font={bold:true,size:10}; ws.getRow(99).height=14;
+
+    // Rows 100-105 — notification fields
+    [
+      ['Número de Parte:', r.npActual||''],
+      ['Cliente:',             r.platform||''],
+      ['Rev. Anterior',        ''],
+      ['Nueva Rev.',           ''],
+      ['Descripción del Cambio', r.descripcion||''],
+      ['Fecha de Implementacion', r.sopPlaneado||''],
+    ].forEach(([lbl,val],i)=>{
+      const rn=100+i;
+      ws.mergeCells(`B${rn}:G${rn}`);
+      const la=ws.getCell(`A${rn}`);
+      la.value=lbl; la.font={bold:true,size:10}; la.border=bAll; la.alignment={vertical:'middle'};
+      const va=ws.getCell(`B${rn}`);
+      va.value=val; va.font={size:10}; va.border=bAll;
+      va.alignment={vertical:'middle',wrapText:true};
+      ws.getRow(rn).height=16;
+    });
+
+    [106,107,108].forEach(n=>{ ws.getRow(n).height=10; });
+
+    // Row 109 — Requiere Notificación
+    ws.getCell('D109').value='Requiere Notificación:';
+    ws.getCell('D109').font={bold:true,size:10}; ws.getRow(109).height=16;
+
+    // Rows 110-123 — notification list
+    TIS_NOTIFICATIONS.forEach(({role,name},i)=>{
+      const rn=110+i;
+      const bg=i%2===0?ALT:WHT;
+      const bc=ws.getCell(`B${rn}`);
+      bc.value=role; bc.font={size:10}; bc.fill=fill(bg); bc.border=bAll;
+      bc.alignment={vertical:'middle'};
+      const cc=ws.getCell(`C${rn}`);
+      cc.value=name; cc.font={size:10}; cc.fill=fill(bg); cc.border=bAll;
+      cc.alignment={vertical:'middle'};
+      ws.getRow(rn).height=16;
+    });
+
+    // Empty sheets matching original structure
+    wb.addWorksheet('Minutas');
+    wb.addWorksheet('Approvals');
+    wb.addWorksheet('Rev History document');
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safe = (r.npActual||'CI'+r.id).replace(/[^a-z0-9_-]/gi,'_');
+    a.href=url; a.download=`TIS-F0788_CI${r.id}_${safe}.xlsx`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(err) {
+    alert('Error al exportar: '+err.message); console.error(err);
+  } finally {
+    if(btn){ btn.textContent=orig; btn.disabled=false; }
+  }
+}
+
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
 document.getElementById('modal-person').addEventListener('click', e => { if(e.target===document.getElementById('modal-person')) closePersonModal(); });
+document.getElementById('modal-tis').addEventListener('click', e => { if(e.target===document.getElementById('modal-tis')) closeTIS(); });
 document.getElementById('login-pw').focus();
 
 document.addEventListener('keydown', e => {
@@ -1736,6 +2187,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (document.getElementById('modal').style.display !== 'none') { closeModal(); return; }
     if (document.getElementById('modal-person').style.display !== 'none') { closePersonModal(); return; }
+    if (document.getElementById('modal-tis').style.display !== 'none') { closeTIS(); return; }
     if (document.activeElement === cellEl) { cellEl.blur(); }
     return;
   }
