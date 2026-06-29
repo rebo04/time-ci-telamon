@@ -1330,8 +1330,8 @@ async function exportToExcel() {
     RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
     sh4.getRow(2).height = 18;
     // Series label headers for chart (hidden cols M=13, N=14)
-    sh4.getCell(2, 13).value = 'En Tiempo';
-    sh4.getCell(2, 14).value = 'Retrasado';
+    sh4.getCell(2, 13).value = 'Fecha Planeada - 2026';
+    sh4.getCell(2, 14).value = 'Fecha real - 2026';
     const completedR4 = records
       .filter(r => r.sopReal && r.sopReal.startsWith('2026'))
       .sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
@@ -1353,7 +1353,7 @@ async function exportToExcel() {
       sh4.getCell(rowNum, 9).value  = calcMes(r)||'';
       sh4.getCell(rowNum, 10).value = r.cell||'';
       sh4.getCell(rowNum, 11).value = r.platform||'';
-      sh4.getCell(rowNum, 12).value = calcSemana(r)||'';
+      sh4.getCell(rowNum, 12).value = String(r.id||'');
       sh4.getCell(rowNum, 13).value = onTime ? 1 : 0;
       sh4.getCell(rowNum, 14).value = onTime ? 0 : 1;
     });
@@ -1435,7 +1435,7 @@ async function exportToExcel() {
     const mesLvl   = completedR4.map(r => calcMes(r)||'');
     const celLvl   = completedR4.map(r => r.cell||'');
     const platLvl  = completedR4.map(r => r.platform||'');
-    const semLvl   = completedR4.map(r => calcSemana(r)||'');
+    const idLvl    = completedR4.map(r => String(r.id||''));
     const onTimeV  = completedR4.map(r => (r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado) ? 1 : 0);
     const delayedV = onTimeV.map(v => 1 - v);
     const lastRow4 = 2 + n4;
@@ -1444,7 +1444,7 @@ async function exportToExcel() {
 <c:f>&apos;Graficas&apos;!$I$3:$L$${lastRow4}</c:f>
 <c:multiLvlStrCache>
 <c:ptCount val="${n4}"/>
-<c:lvl>${ptList(semLvl)}</c:lvl>
+<c:lvl>${ptList(idLvl)}</c:lvl>
 <c:lvl>${ptList(platLvl)}</c:lvl>
 <c:lvl>${ptList(celLvl)}</c:lvl>
 <c:lvl>${ptList(mesLvl)}</c:lvl>
@@ -1460,14 +1460,14 @@ async function exportToExcel() {
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
 <c:ser>
 <c:idx val="0"/><c:order val="0"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>En Tiempo</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="22c55e"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$3:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:ser>
 <c:idx val="1"/><c:order val="1"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Retrasado</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="ef4444"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$3:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
@@ -1475,7 +1475,7 @@ async function exportToExcel() {
 <c:axId val="11"/><c:axId val="12"/>
 </c:barChart>
 <c:catAx><c:axId val="11"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="12"/></c:catAx>
-<c:valAx><c:axId val="12"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:crossAx val="11"/></c:valAx>
+<c:valAx><c:axId val="12"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:majorUnit val="0.5"/><c:numFmt formatCode="General" sourceLinked="1"/><c:crossAx val="11"/></c:valAx>
 </c:plotArea>
 <c:plotVisOnly val="1"/>
 </c:chart>
