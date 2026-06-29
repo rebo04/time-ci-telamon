@@ -373,7 +373,7 @@
 <div id="modal-person" class="modal-ov" style="display:none;">
   <div style="background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:440px;margin:16px;">
     <div style="background:#1e3a8a;color:white;padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;">
-      <h2 style="font-size:18px;font-weight:700;">Nueva Persona</h2>
+      <h2 id="person-modal-title" style="font-size:18px;font-weight:700;">Nueva Persona</h2>
       <button onclick="closePersonModal()" style="background:none;border:none;color:#93c5fd;font-size:24px;cursor:pointer;font-weight:700;line-height:1;">✕</button>
     </div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
@@ -494,6 +494,7 @@ let currentTimePeriod = 'mes';
 const FIELDS = ['sup','platform','cell','cuenta','npActual','npNuevo','descripcion','comentarios','ppapEntregado','ppapAprob','sopPlaneado','sopReal','issue','accionCorr'];
 let colVisible = { estatus: false, mes: false, semana: false, issue: false, accionCorr: false };
 let attDeptFilter = '';
+let editingPersonId = null;
 const ALL_DEPTS = ['APQP','CONFIABILIDAD','CALIDAD EF','AUTOMATIZACION','MANTENIMIENTO EF','MANTENIMIENTO PLANTA','CONTROL DE PRODUCCION','EMBARQUES','MANUFACTURA B10','MANUFACTURA B12','CORTE/SLP','ETIQUETAS','SEGURIDAD'];
 
 // ── Sync indicator
@@ -1009,9 +1010,16 @@ function renderAttendance() {
       const total = meetingDates.filter(d=>p.attendance&&p.attendance[d]===1).length;
       const bg = rowIdx % 2 === 0 ? 'white' : '#f8fafc';
       rowIdx++;
+      const safeName = p.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const actBtns = readOnly ? '' :
+        `<button onclick="event.stopPropagation();editPersonDept('${p._docId}')" title="Editar departamento" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0;" onmouseover="this.style.color='#3b82f6';this.style.background='#eff6ff'" onmouseout="this.style.color='#94a3b8';this.style.background='none'">✏ Dept</button>` +
+        `<button onclick="event.stopPropagation();deletePerson('${p._docId}','${safeName}')" title="Eliminar persona" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0;" onmouseover="this.style.color='#ef4444';this.style.background='#fee2e2'" onmouseout="this.style.color='#94a3b8';this.style.background='none'">✕ Eliminar</button>`;
+      const nameCell = readOnly
+        ? `<td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:0;background:${bg};z-index:1;">${p.name}</td>`
+        : `<td style="padding:6px 10px;position:sticky;left:0;background:${bg};z-index:1;"><div style="display:flex;align-items:center;gap:4px;"><span style="flex:1;font-weight:500;font-size:13px;cursor:text;padding:4px;" onclick="editPersonName(event,this,'${p._docId}')" title="Clic para editar nombre">${p.name}</span>${actBtns}</div></td>`;
       rows.push(
         `<tr style="border-top:1px solid #f1f5f9;background:${bg};">` +
-        `<td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:0;background:${bg};z-index:1;">${p.name}</td>` +
+        nameCell +
         displayDates.map(d => {
           const v = p.attendance?.[d];
           const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${globalIdx})"`;
@@ -1071,10 +1079,59 @@ async function removeMeeting(d) {
 }
 
 function addPerson() {
+  editingPersonId = null;
+  document.getElementById('person-modal-title').textContent = 'Nueva Persona';
   document.getElementById('person-name').value = '';
   Array.from(document.getElementById('person-dept').options).forEach(o => o.selected = false);
   document.getElementById('modal-person').style.display = 'flex';
   document.getElementById('person-name').focus();
+}
+function editPersonDept(docId) {
+  const p = people.find(x => x._docId === docId);
+  if (!p) return;
+  editingPersonId = docId;
+  document.getElementById('person-modal-title').textContent = 'Editar Persona';
+  document.getElementById('person-name').value = p.name;
+  const depts = (p.dept||'').split(' / ').map(d => d.trim());
+  Array.from(document.getElementById('person-dept').options).forEach(o => { o.selected = depts.includes(o.value); });
+  document.getElementById('modal-person').style.display = 'flex';
+  document.getElementById('person-name').focus();
+}
+function editPersonName(event, span, docId) {
+  event.stopPropagation();
+  const p = people.find(x => x._docId === docId);
+  if (!p) return;
+  const curVal = p.name;
+  const inp = document.createElement('input');
+  inp.value = curVal;
+  inp.style.cssText = 'flex:1;border:1.5px solid #3b82f6;border-radius:6px;padding:3px 7px;font-size:13px;font-family:inherit;background:#eff6ff;outline:none;box-sizing:border-box;min-width:80px;';
+  span.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return; done = true;
+    inp.onblur = null;
+    const newVal = inp.value.trim();
+    if (newVal && newVal !== curVal) {
+      try {
+        await db.collection('people').doc(docId).update({name: newVal});
+        p.name = newVal;
+      } catch(e) { alert('Error: '+e.message); }
+    }
+    renderAttendance();
+  };
+  inp.onblur = commit;
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { done = true; inp.onblur = null; renderAttendance(); }
+  };
+}
+async function deletePerson(docId, name) {
+  if (!confirm(`¿Eliminar a "${name}" de asistencia?\nSe perderán todos sus registros.`)) return;
+  setSyncing(true);
+  try { await db.collection('people').doc(docId).delete(); }
+  catch(e) { alert('Error: '+e.message); }
+  setSyncing(false);
 }
 function closePersonModal() {
   document.getElementById('modal-person').style.display = 'none';
@@ -1087,7 +1144,14 @@ async function saveNewPerson() {
   const dept = selected.join(' / ');
   closePersonModal();
   setSyncing(true);
-  try { await db.collection('people').add({dept, name, attendance:{}}); }
+  try {
+    if (editingPersonId) {
+      await db.collection('people').doc(editingPersonId).update({name, dept});
+      editingPersonId = null;
+    } else {
+      await db.collection('people').add({dept, name, attendance:{}});
+    }
+  }
   catch(err) { alert('Error: '+err.message); }
   setSyncing(false);
 }
