@@ -752,29 +752,95 @@ function renderTable() {
     const ano  = calcAno(r);
     const mes  = calcMes(r) || '–';
     const sem  = calcSemana(r) || '–';
-    return `<tr style="border-top:1px solid #f1f5f9;cursor:pointer;" onclick="openTIS(${r.id})" title="Ver TIS-F0788">
-      <td style="padding:10px;${R}color:#9ca3af;font-family:monospace;font-size:12px;">${r.id}</td>
+    // editable cell: click to edit, title shows full value on hover
+    const ec = (field, content, xs='', ttl='') => {
+      if (readOnly) return `<td style="padding:10px;${R}font-size:12px;${xs}"${ttl?` title="${ttl}"`:''}>${content}</td>`;
+      return `<td style="padding:10px;${R}font-size:12px;${xs}cursor:text;" title="${ttl||'Clic para editar'}" onclick="editCICell(event,this,'${field}',${r.id})">${content}</td>`;
+    };
+    return `<tr style="border-top:1px solid #f1f5f9;${readOnly?'cursor:pointer;':''}" ${readOnly?`onclick="openTIS(${r.id})" title="Ver TIS-F0788"`:''}>
+      <td style="padding:10px;${R}font-family:monospace;font-size:12px;cursor:pointer;color:#1e3a8a;font-weight:700;" onclick="openTIS(${r.id})" title="Ver TIS-F0788">${r.id}</td>
       <td style="padding:10px;${R}font-size:12px;font-weight:600;color:${ano==='Abierto'?'#c2410c':'#1e3a8a'};">${ano}</td>
-      <td style="padding:10px;${R}font-weight:600;">${r.sup}</td>
-      <td style="padding:10px;${R}">${r.platform}</td>
-      <td style="padding:10px;${R}">${r.cell}</td>
-      <td style="padding:10px;${R}font-family:monospace;font-size:12px;">${r.npActual}</td>
-      <td style="padding:10px;${R}font-family:monospace;font-size:12px;">${r.npNuevo}</td>
-      <td style="padding:10px;${R}font-size:12px;">${r.cuenta}</td>
-      <td style="padding:10px;${R}font-size:12px;" title="${r.descripcion.replace(/"/g,'&quot;')}">${desc}</td>
-      <td style="padding:10px;${R}font-size:12px;" title="${(r.comentarios||'').replace(/"/g,'&quot;')}">${comt||'–'}</td>
-      ${colVisible.issue      ? `<td style="padding:10px;${R}font-size:12px;" title="${(r.issue||'').replace(/"/g,'&quot;')}">${iss||'–'}</td>`      : ''}
-      ${colVisible.accionCorr ? `<td style="padding:10px;${R}font-size:12px;" title="${(r.accionCorr||'').replace(/"/g,'&quot;')}">${acn||'–'}</td>` : ''}
-      <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapEntregado||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;text-align:center;">${r.ppapAprob||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;">${r.sopPlaneado||'–'}</td>
-      <td style="padding:10px;${R}font-size:12px;">${r.sopReal||'–'}</td>
+      ${ec('sup',          r.sup,                'font-weight:600;')}
+      ${ec('platform',     r.platform)}
+      ${ec('cell',         r.cell)}
+      ${ec('npActual',     r.npActual,           'font-family:monospace;')}
+      ${ec('npNuevo',      r.npNuevo,            'font-family:monospace;')}
+      ${ec('cuenta',       r.cuenta)}
+      ${ec('descripcion',  desc,                 '',  r.descripcion.replace(/"/g,'&quot;'))}
+      ${ec('comentarios',  comt||'–',            '',  (r.comentarios||'').replace(/"/g,'&quot;'))}
+      ${colVisible.issue      ? ec('issue',      iss||'–', '', (r.issue||'').replace(/"/g,'&quot;'))      : ''}
+      ${colVisible.accionCorr ? ec('accionCorr', acn||'–', '', (r.accionCorr||'').replace(/"/g,'&quot;')) : ''}
+      ${ec('ppapEntregado', r.ppapEntregado||'–', 'text-align:center;')}
+      ${ec('ppapAprob',     r.ppapAprob||'–',     'text-align:center;')}
+      ${ec('sopPlaneado',   r.sopPlaneado||'–')}
+      ${ec('sopReal',       r.sopReal||'–')}
       ${colVisible.mes    ? `<td style="padding:10px;${R}font-size:12px;text-align:center;">${mes}</td>`  : ''}
       ${colVisible.semana ? `<td style="padding:10px;${R}font-size:12px;text-align:center;">${sem}</td>` : ''}
       ${colVisible.estatus? `<td style="padding:10px;${R}">${badge(s)}</td>`                              : ''}
       ${readOnly ? '' : `<td style="padding:10px;${R}white-space:nowrap;" onclick="event.stopPropagation()"><button onclick="openModal(${r.id})" class="btn-e">Editar</button>&nbsp;<button onclick="deleteRecord(${r.id})" class="btn-d">Eliminar</button></td>`}
     </tr>`;
   }).join('');
+}
+
+function editCICell(event, td, field, ciId) {
+  event.stopPropagation();
+  if (td.querySelector('input,select,textarea')) return; // already editing
+
+  const rec = records.find(x => x.id === ciId);
+  if (!rec) return;
+  const curVal = rec[field] != null ? String(rec[field]) : '';
+
+  const DATE_FIELDS = ['ppapEntregado','ppapAprob','sopPlaneado','sopReal'];
+  const TA_FIELDS   = ['descripcion','comentarios','issue','accionCorr'];
+  const base = 'width:100%;border:1.5px solid #3b82f6;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;background:#eff6ff;outline:none;box-sizing:border-box;';
+
+  let el;
+  if (field === 'sup' || field === 'platform') {
+    el = document.createElement('select');
+    el.style.cssText = base;
+    const srcSel = document.getElementById('form-' + field);
+    const opts = srcSel ? Array.from(srcSel.options).filter(o => o.value) : [];
+    opts.forEach(o => el.appendChild(new Option(o.text, o.value, false, o.value === curVal)));
+  } else if (DATE_FIELDS.includes(field)) {
+    el = document.createElement('input');
+    el.type = 'date'; el.value = curVal;
+    el.style.cssText = base;
+  } else if (TA_FIELDS.includes(field)) {
+    el = document.createElement('textarea');
+    el.value = curVal; el.rows = 3;
+    el.style.cssText = base + 'resize:vertical;min-width:180px;';
+  } else {
+    el = document.createElement('input');
+    el.type = 'text'; el.value = curVal;
+    el.style.cssText = base + 'min-width:80px;';
+  }
+
+  td.innerHTML = '';
+  td.appendChild(el);
+  el.focus();
+  if (el.select && el.type !== 'date') el.select();
+
+  let done = false;
+  const commit = async () => {
+    if (done) return; done = true;
+    el.onblur = null;
+    const newVal = el.value;
+    try {
+      if (newVal !== curVal) {
+        await db.collection('cambios').doc(String(ciId)).update({[field]: newVal});
+        rec[field] = newVal;
+      }
+    } catch(err) {
+      alert('Error al guardar: ' + err.message);
+    }
+    renderTable();
+  };
+
+  el.onblur = commit;
+  el.onkeydown = e => {
+    if (e.key === 'Enter' && el.tagName !== 'TEXTAREA') { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { done = true; el.onblur = null; renderTable(); }
+  };
 }
 
 // ── CRUD (Firestore)
