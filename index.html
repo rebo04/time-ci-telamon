@@ -56,6 +56,18 @@
     kbd{background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;padding:1px 5px;font-size:11px;font-family:monospace;}
     .btn-export{background:#1e3a8a;color:white;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:background .15s;}
     .btn-export:hover{background:#1e40af;}
+    /* TIS-F0788 editable inputs */
+    .tis-inp{border:none;width:100%;padding:2px 5px;background:transparent;font-size:12px;font-family:inherit;border-bottom:1.5px dashed #cbd5e1;outline:none;box-sizing:border-box;transition:background .12s,border-color .12s;border-radius:0;}
+    .tis-inp:focus{border-bottom:1.5px solid #3b82f6;background:#eff6ff;}
+    .tis-inp:disabled{border-bottom-color:transparent;cursor:default;}
+    .tis-ta{width:100%;padding:4px 5px;font-size:12px;font-family:inherit;border:1px dashed #cbd5e1;border-radius:4px;outline:none;box-sizing:border-box;resize:vertical;min-height:36px;background:transparent;transition:background .12s,border-color .12s;}
+    .tis-ta:focus{border:1px solid #3b82f6;background:#eff6ff;}
+    .tis-ta:disabled{border-color:transparent;cursor:default;}
+    .tis-date{border:1px solid #e2e8f0;border-radius:4px;padding:2px 4px;font-size:11px;font-family:inherit;box-sizing:border-box;width:100%;cursor:pointer;outline:none;transition:border-color .12s;}
+    .tis-date:focus{border-color:#3b82f6;background:#eff6ff;}
+    .tis-date:disabled{cursor:default;background:#f9fafb;}
+    .tis-saved{animation:tisSave .5s ease;}
+    @keyframes tisSave{0%{background:#dcfce7}100%{background:transparent}}
     /* Smooth transitions on interactive elements */
     select, input[type=text], input[type=password] {
       transition: border-color .15s, box-shadow .15s;
@@ -1843,80 +1855,114 @@ function openTIS(id) {
 }
 
 function closeTIS() {
+  const ae = document.activeElement;
+  if (ae && document.getElementById('modal-tis').contains(ae)) ae.blur();
   document.getElementById('modal-tis').style.display = 'none';
 }
 
 function buildTISHTML(r) {
   const S = s => (s||'').toString()
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const ro  = readOnly ? 'disabled' : '';
+  const cid = r.id;
   const bdr = 'border:1px solid #e2e8f0;';
   const pad = 'padding:5px 8px;';
   const fn  = 'font-size:12px;';
   const pw  = 'white-space:pre-wrap;';
 
-  // Header section
-  const hdrRows = [
-    ['INGENIERO RESPONSABLE', r.sup],
-    ['CLIENTE',               r.platform],
-    ['PROGRAMA',              r.cuenta],
-    ['CELULA',                r.cell],
-    ['TIPO DE CAMBIO',        ''],
-    ['NUMERO DE PARTE',       (r.npActual||'') + (r.npNuevo ? ' → ' + r.npNuevo : '')],
-  ].map(([lbl,val]) =>
-    `<tr><td style="${bdr}${pad}${fn}font-weight:700;background:#f1f5f9;white-space:nowrap;width:200px;">${lbl}</td>`+
-    `<td style="${bdr}${pad}${fn}${pw}">${S(val)}</td></tr>`
+  // Helper: inline text input that saves on change
+  const inp = (val, field, xtra='') =>
+    `<input class="tis-inp" value="${S(val||'')}" onchange="saveTISField(this,'${field}',${cid})" ${ro} ${xtra}>`;
+
+  // Helper: textarea that saves on change
+  const ta = (val, field, rows=2) =>
+    `<textarea class="tis-ta" rows="${rows}" onchange="saveTISField(this,'${field}',${cid})" ${ro}>${S(val||'')}</textarea>`;
+
+  // Header section — editable fields
+  const hdrFields = [
+    {lbl:'INGENIERO RESPONSABLE', val:r.sup,        field:'sup'},
+    {lbl:'CLIENTE',               val:r.platform,   field:'platform'},
+    {lbl:'PROGRAMA',              val:r.cuenta,     field:'cuenta'},
+    {lbl:'CELULA',                val:r.cell,       field:'cell'},
+    {lbl:'TIPO DE CAMBIO',        val:r.tipoCambio, field:'tipoCambio'},
+  ];
+  const hdrRows = hdrFields.map(({lbl,val,field}) =>
+    `<tr>`+
+    `<td style="${bdr}${pad}${fn}font-weight:700;background:#f1f5f9;white-space:nowrap;width:200px;">${lbl}</td>`+
+    `<td style="${bdr}${pad}">${inp(val, field)}</td>`+
+    `</tr>`
   ).join('');
+
+  // NUMERO DE PARTE: two inputs side by side
+  const npRow = `<tr>`+
+    `<td style="${bdr}${pad}${fn}font-weight:700;background:#f1f5f9;white-space:nowrap;width:200px;">NUMERO DE PARTE</td>`+
+    `<td style="${bdr}${pad}"><div style="display:flex;align-items:center;gap:6px;">`+
+    `${inp(r.npActual,'npActual','style="width:44%;" placeholder=&quot;NP Actual&quot;')}`+
+    `<span style="${fn}color:#9ca3af;flex-shrink:0;">→</span>`+
+    `${inp(r.npNuevo,'npNuevo','style="width:44%;" placeholder=&quot;NP Nuevo&quot;')}`+
+    `</div></td>`+
+    `</tr>`;
 
   const hdr = `
   <div style="padding:20px 24px 12px;">
+    ${readOnly?'':'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px 14px;margin-bottom:10px;font-size:12px;color:#1e40af;">✏️ Haz clic en cualquier campo para editar — se guarda automáticamente al salir del campo.</div>'}
     <div style="border:2px solid #1e3a8a;border-radius:6px;overflow:hidden;">
       <div style="background:#1e3a8a;color:white;padding:9px 14px;font-weight:800;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
         <span>TIS-F0788 – Engineering Changes Tracker</span>
         <span style="font-size:11px;font-weight:400;color:#93c5fd;">Update:</span>
       </div>
-      <table style="width:100%;border-collapse:collapse;">${hdrRows}</table>
+      <table style="width:100%;border-collapse:collapse;">
+        ${hdrRows}
+        ${npRow}
+      </table>
       <div style="${bdr}${pad}font-weight:700;font-size:11px;background:#f1f5f9;color:#374151;letter-spacing:.04em;">DESCRIPCION DEL CAMBIO</div>
-      <div style="${bdr}padding:8px;${fn}${pw}min-height:36px;">${S(r.descripcion)}</div>
+      <div style="${bdr}padding:6px 8px;">${ta(r.descripcion,'descripcion',3)}</div>
       <div style="${bdr}${pad}font-weight:700;font-size:11px;background:#f1f5f9;color:#374151;letter-spacing:.04em;">COMENTARIOS</div>
-      <div style="${bdr}padding:8px;${fn}${pw}min-height:28px;">${S(r.comentarios)}</div>
+      <div style="${bdr}padding:6px 8px;">${ta(r.comentarios,'comentarios',2)}</div>
     </div>
   </div>`;
 
-  // Activities table
+  // Activities table — dates are editable
+  const tisActs = r.tisActivities || {};
   let actRows = '';
   TIS_ACTIVITIES.forEach((act, idx) => {
     if (act.t === 's') {
-      actRows += `<tr style="background:#374151;"><td style="${bdr}${pad}"></td>`+
-        `<td colspan="5" style="${bdr}${pad}font-weight:800;font-size:11px;color:white;letter-spacing:.5px;">${S(act.b)}</td></tr>`;
+      actRows += `<tr style="background:#374151;">`+
+        `<td style="${bdr}${pad}"></td>`+
+        `<td colspan="5" style="${bdr}${pad}font-weight:800;font-size:11px;color:white;letter-spacing:.5px;">${S(act.b)}</td>`+
+        `</tr>`;
     } else {
       const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
+      const ad = tisActs[idx] || {};
+      const di = (val, key) =>
+        `<input type="date" class="tis-date" value="${S(val||'')}" onchange="saveTISActivity(this,${idx},'${key}',${cid})" ${ro}>`;
       actRows += `<tr style="background:${bg};">`+
         `<td style="${bdr}${pad}width:22px;"></td>`+
         `<td style="${bdr}${pad}${fn}${pw}">${S(act.b)}</td>`+
         `<td style="${bdr}${pad}${fn}${pw}">${S(act.c)}</td>`+
         `<td style="${bdr}${pad}${fn}${pw}">${S(act.d)}</td>`+
-        `<td style="${bdr}${pad}${fn}min-width:86px;color:#d1d5db;text-align:center;font-size:10px;">—</td>`+
-        `<td style="${bdr}${pad}${fn}min-width:86px;color:#d1d5db;text-align:center;font-size:10px;">—</td>`+
+        `<td style="${bdr}padding:3px 5px;min-width:110px;">${di(ad.p,'p')}</td>`+
+        `<td style="${bdr}padding:3px 5px;min-width:110px;">${di(ad.r,'r')}</td>`+
         `</tr>`;
     }
   });
 
   const acts = `
   <div style="padding:0 24px 12px;overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;min-width:700px;">
+    <table style="width:100%;border-collapse:collapse;min-width:720px;">
       <thead><tr style="background:#1e3a8a;color:white;">
         <th style="${bdr}${pad}width:22px;"></th>
         <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:280px;">ACTIVIDADES</th>
         <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:150px;">DEPARTAMENTO</th>
         <th style="${bdr}${pad}font-size:11px;text-align:left;min-width:120px;">RESPONSABLE</th>
-        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:86px;">FECHA PLANEADA</th>
-        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:86px;">FECHA REAL</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:110px;">FECHA PLANEADA</th>
+        <th style="${bdr}${pad}font-size:11px;text-align:center;min-width:110px;">FECHA REAL</th>
       </tr></thead>
       <tbody>${actRows}</tbody>
     </table>
   </div>`;
 
-  // Notes
+  // Notes (static)
   const notes = `
   <div style="padding:0 24px 12px;">
     <div style="border:1px solid #fcd34d;border-radius:4px;padding:10px 14px;background:#fffbeb;font-size:12px;">
@@ -1926,7 +1972,7 @@ function buildTISHTML(r) {
     </div>
   </div>`;
 
-  // Notification section
+  // Notification section (static — names come from the TIS template)
   const notifRows = TIS_NOTIFICATIONS.map((n, i) =>
     `<tr style="background:${i%2===0?'#f8fafc':'#fff'};">`+
     `<td style="${bdr}${pad}${fn}">${S(n.role)}</td>`+
@@ -1958,6 +2004,42 @@ function buildTISHTML(r) {
   </div>`;
 
   return hdr + acts + notes + notif;
+}
+
+async function saveTISField(el, field, ciId) {
+  const val = el.value;
+  try {
+    await db.collection('cambios').doc(String(ciId)).update({[field]: val});
+    const rec = records.find(x => x.id === ciId);
+    if (rec) rec[field] = val;
+    el.classList.add('tis-saved');
+    el.addEventListener('animationend', () => el.classList.remove('tis-saved'), {once:true});
+  } catch(err) {
+    console.error('TIS save error:', err);
+    el.style.background = '#fee2e2';
+    setTimeout(() => { el.style.background = ''; }, 2000);
+  }
+}
+
+async function saveTISActivity(el, actIdx, key, ciId) {
+  const val = el.value;
+  try {
+    await db.collection('cambios').doc(String(ciId)).update({
+      [`tisActivities.${actIdx}.${key}`]: val
+    });
+    const rec = records.find(x => x.id === ciId);
+    if (rec) {
+      if (!rec.tisActivities) rec.tisActivities = {};
+      if (!rec.tisActivities[actIdx]) rec.tisActivities[actIdx] = {};
+      rec.tisActivities[actIdx][key] = val;
+    }
+    el.classList.add('tis-saved');
+    el.addEventListener('animationend', () => el.classList.remove('tis-saved'), {once:true});
+  } catch(err) {
+    console.error('TIS activity save error:', err);
+    el.style.background = '#fee2e2';
+    setTimeout(() => { el.style.background = ''; }, 2000);
+  }
 }
 
 async function exportTIS(id) {
@@ -2074,6 +2156,9 @@ async function exportTIS(id) {
         ws.getCell(`B${rn}`).value=act.b||'';
         ws.getCell(`C${rn}`).value=act.c||'';
         ws.getCell(`D${rn}`).value=act.d||'';
+        const _ad=(r.tisActivities||{})[i]||{};
+        if(_ad.p){const dP=new Date(_ad.p+'T12:00:00');ws.getCell(`E${rn}`).value=dP;ws.getCell(`E${rn}`).numFmt='dd/mm/yyyy';}
+        if(_ad.r){const dR=new Date(_ad.r+'T12:00:00');ws.getCell(`F${rn}`).value=dR;ws.getCell(`F${rn}`).numFmt='dd/mm/yyyy';}
         if(act.f){
           ws.getCell(`G${rn}`).value={
             formula:`IF(AND(ISNUMBER(E${rn}),ISNUMBER(F${rn})),INT((F${rn}-E${rn})/7)*5+IF(WEEKDAY(F${rn})-MOD(F${rn}-E${rn},7)<1,MOD(F${rn}-E${rn},7)-2,MOD(F${rn}-E${rn},7)),"")`
