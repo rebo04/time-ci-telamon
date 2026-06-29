@@ -965,43 +965,67 @@ function renderAttendance() {
       depts.map(d=>`<option value="${d}"${d===curVal?' selected':''}>${d}</option>`).join('');
   }
 
-  const visiblePeople = attDeptFilter ? people.filter(p=>p.dept===attDeptFilter) : people;
+  const filteredPeople = attDeptFilter ? people.filter(p=>p.dept===attDeptFilter) : people;
   const displayDates = [...meetingDates].reverse();
+  const totalCols = displayDates.length + 2; // Responsable + dates + Total
+
+  // Group by dept (alpha order), keep original person order within each dept
+  const deptGroups = {};
+  filteredPeople.forEach(p => {
+    const dept = p.dept || 'Sin departamento';
+    if (!deptGroups[dept]) deptGroups[dept] = [];
+    deptGroups[dept].push(p);
+  });
+  const sortedDepts = Object.keys(deptGroups).sort();
 
   head.innerHTML = `<tr style="background:#1e3a8a;color:white;text-align:center;">
-    <th style="padding:12px 14px;text-align:left;position:sticky;left:0;background:#1e3a8a;min-width:160px;z-index:2;">Departamento</th>
-    <th style="padding:12px 14px;text-align:left;position:sticky;left:160px;background:#1e3a8a;min-width:160px;z-index:2;">Responsable</th>
+    <th style="padding:12px 14px;text-align:left;position:sticky;left:0;background:#1e3a8a;min-width:200px;z-index:2;">Responsable</th>
     ${displayDates.map(d => {
       const dt = new Date(d+'T12:00:00');
       const lbl = dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});
-      const cnt = visiblePeople.filter(p=>p.attendance&&p.attendance[d]===1).length;
+      const cnt = filteredPeople.filter(p=>p.attendance&&p.attendance[d]===1).length;
       return `<th style="padding:8px 6px;min-width:80px;">
         <div style="font-size:12px;font-weight:700;">${lbl}</div>
-        <div style="color:#93c5fd;font-size:11px;">${cnt}/${visiblePeople.length} ✓</div>
+        <div style="color:#93c5fd;font-size:11px;">${cnt}/${filteredPeople.length} ✓</div>
         <button onclick="removeMeeting('${d}')" title="Eliminar fecha" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:10px;margin-top:2px;">✕ quitar</button>
       </th>`;
     }).join('')}
     <th style="padding:12px 8px;min-width:70px;">Total</th>
   </tr>`;
 
-  body.innerHTML = visiblePeople.map((p, vi) => {
-    const globalIdx = people.indexOf(p);
-    const total = meetingDates.filter(d=>p.attendance&&p.attendance[d]===1).length;
-    const bg = vi%2===0?'white':'#f8fafc';
-    return `<tr style="border-top:1px solid #f1f5f9;background:${bg};">
-      <td style="padding:10px 14px;font-weight:600;font-size:13px;color:#4b5563;position:sticky;left:0;background:${bg};z-index:1;">${p.dept||''}</td>
-      <td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:160px;background:${bg};z-index:1;">${p.name}</td>
-      ${displayDates.map(d => {
-        const v = p.attendance?.[d];
-        const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${globalIdx})"`;
-        if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes" title="Clic para cambiar"${tgl}>&#10003;</div></td>`;
-        if (v===0) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-no" title="Clic para cambiar"${tgl}>&#10007;</div></td>`;
-        return `<td style="padding:6px;text-align:center;"><div class="att-cell att-na" title="Clic para cambiar"${tgl}>–</div></td>`;
-      }).join('')}
-      <td style="padding:10px 8px;text-align:center;font-weight:700;color:#1e40af;">${total}/${meetingDates.length}</td>
-    </tr>`;
-  }).join('');
+  const rows = [];
+  let rowIdx = 0;
 
+  sortedDepts.forEach(dept => {
+    // One header row per department — shows the name exactly once
+    rows.push(
+      `<tr style="background:#dbeafe;border-top:2px solid #bfdbfe;">` +
+      `<td colspan="${totalCols}" style="padding:6px 16px;font-weight:700;font-size:12px;color:#1e3a8a;letter-spacing:.06em;text-transform:uppercase;">${dept}</td>` +
+      `</tr>`
+    );
+
+    deptGroups[dept].forEach(p => {
+      const globalIdx = people.indexOf(p);
+      const total = meetingDates.filter(d=>p.attendance&&p.attendance[d]===1).length;
+      const bg = rowIdx % 2 === 0 ? 'white' : '#f8fafc';
+      rowIdx++;
+      rows.push(
+        `<tr style="border-top:1px solid #f1f5f9;background:${bg};">` +
+        `<td style="padding:10px 14px;font-weight:500;font-size:13px;position:sticky;left:0;background:${bg};z-index:1;">${p.name}</td>` +
+        displayDates.map(d => {
+          const v = p.attendance?.[d];
+          const tgl = readOnly ? '' : ` onclick="toggleAtt('${p._docId}','${d}',${globalIdx})"`;
+          if (v===1) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-yes" title="Clic para cambiar"${tgl}>&#10003;</div></td>`;
+          if (v===0) return `<td style="padding:6px;text-align:center;"><div class="att-cell att-no" title="Clic para cambiar"${tgl}>&#10007;</div></td>`;
+          return `<td style="padding:6px;text-align:center;"><div class="att-cell att-na" title="Clic para cambiar"${tgl}>–</div></td>`;
+        }).join('') +
+        `<td style="padding:10px 8px;text-align:center;font-weight:700;color:#1e40af;">${total}/${meetingDates.length}</td>` +
+        `</tr>`
+      );
+    });
+  });
+
+  body.innerHTML = rows.join('');
   renderAttSummary();
 }
 
