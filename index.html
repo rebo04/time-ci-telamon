@@ -990,7 +990,7 @@ async function addMeeting() {
   if (meetingDates.includes(d)) { alert('Esa fecha ya existe'); return; }
   const newDates = [...meetingDates, d].sort();
   setSyncing(true);
-  try { await db.collection('config').doc('meetingDates').set({dates: newDates}); }
+  try { await db.collection('config').doc('meetingDates').set({dates: newDates}, {merge:true}); }
   catch(err) { alert('Error: '+err.message); }
   setSyncing(false);
 }
@@ -1000,7 +1000,7 @@ async function removeMeeting(d) {
   const newDates = meetingDates.filter(x=>x!==d);
   setSyncing(true);
   const batch = db.batch();
-  batch.set(db.collection('config').doc('meetingDates'), {dates: newDates});
+  batch.set(db.collection('config').doc('meetingDates'), {dates: newDates}, {merge:true});
   people.forEach(p => {
     if (p.attendance?.[d] !== undefined) {
       const att = {...p.attendance};
@@ -1986,9 +1986,9 @@ function buildTISHTML(r) {
   const npRow = `<tr>`+
     `<td style="${bdr}${pad}${fn}font-weight:700;background:#f1f5f9;white-space:nowrap;width:200px;">NUMERO DE PARTE</td>`+
     `<td style="${bdr}${pad}"><div style="display:flex;align-items:center;gap:6px;">`+
-    `${inp(r.npActual,'npActual','style="width:44%;" placeholder=&quot;NP Actual&quot;')}`+
+    `${inp(r.npActual,'npActual',"style=\"width:44%;\" placeholder='NP Actual'")}`+
     `<span style="${fn}color:#9ca3af;flex-shrink:0;">→</span>`+
-    `${inp(r.npNuevo,'npNuevo','style="width:44%;" placeholder=&quot;NP Nuevo&quot;')}`+
+    `${inp(r.npNuevo,'npNuevo',"style=\"width:44%;\" placeholder='NP Nuevo'")}`+
     `</div></td>`+
     `</tr>`;
 
@@ -2098,7 +2098,7 @@ function buildTISHTML(r) {
 async function saveTISField(el, field, ciId) {
   const val = el.value;
   try {
-    await db.collection('cambios').doc(String(ciId)).update({[field]: val});
+    await db.collection('records').doc(String(ciId)).update({[field]: val});
     const rec = records.find(x => x.id === ciId);
     if (rec) rec[field] = val;
     el.classList.add('tis-saved');
@@ -2113,7 +2113,7 @@ async function saveTISField(el, field, ciId) {
 async function saveTISActivity(el, actIdx, key, ciId) {
   const val = el.value;
   try {
-    await db.collection('cambios').doc(String(ciId)).update({
+    await db.collection('records').doc(String(ciId)).update({
       [`tisActivities.${actIdx}.${key}`]: val
     });
     const rec = records.find(x => x.id === ciId);
