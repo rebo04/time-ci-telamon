@@ -1599,10 +1599,10 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
     // SHEET 4 — ASISTENCIA
     // ════════════════════════════════════════════
     const sh3 = wb.addWorksheet('Asistencia');
-    sh3.columns = [{width:18},{width:22},...meetingDates.flatMap(()=>[{width:22},{width:7}]),{width:10}];
+    sh3.columns = [{width:18},{width:22},...meetingDates.flatMap(()=>[{width:12}]),{width:10}];
 
     // Title
-    const totalCols = 2 + meetingDates.length*2 + 1;
+    const totalCols = 2 + meetingDates.length + 1;
     sh3.mergeCells(1,1,1,totalCols);
     Object.assign(sh3.getCell('A1'),{
       value:'Registro de Asistencia a Reuniones CI',
@@ -1613,34 +1613,20 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
     sh3.getRow(1).height=34;
     sh3.getRow(2).height=8;
 
-    // Row 3: merged date headers
+    // Row 3: header row — Departamento, Persona (each shown once), one column per fecha, Total
     const r3 = sh3.getRow(3); r3.height=28;
     hdrCell(r3.getCell(1),'Departamento');
     hdrCell(r3.getCell(2),'Persona');
     meetingDates.forEach((d,i)=>{
-      const col = 3+i*2;
-      sh3.mergeCells(3,col,3,col+1);
+      const col = 3+i;
       const dt = new Date(d+'T12:00:00');
       hdrCell(sh3.getCell(3,col), dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}));
     });
-    sh3.mergeCells(3,3+meetingDates.length*2,3,3+meetingDates.length*2);
-    hdrCell(sh3.getCell(3,3+meetingDates.length*2),'Total');
-
-    // Row 4: Nombre / P/A subheaders
-    const r4 = sh3.getRow(4); r4.height=16;
-    meetingDates.forEach((_,i)=>{
-      [3+i*2, 3+i*2+1].forEach((col,j)=>{
-        const c=sh3.getCell(4,col);
-        c.value=j===0?'Nombre':'P/A';
-        c.font={bold:true,size:9,color:{argb:C.white}};
-        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF374151'}};
-        c.alignment={horizontal:'center'};
-      });
-    });
+    hdrCell(sh3.getCell(3,3+meetingDates.length),'Total');
 
     // Data rows
     people.forEach((p,pi)=>{
-      const dRow = sh3.getRow(5+pi); dRow.height=22;
+      const dRow = sh3.getRow(4+pi); dRow.height=22;
       const alt = pi%2===1;
       const bg = alt ? C.gray : 'FFFFFFFF';
       const total = meetingDates.filter(d=>p.attendance?.[d]===1).length;
@@ -1653,13 +1639,8 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
       });
 
       meetingDates.forEach((d,i)=>{
-        const nameC = dRow.getCell(3+i*2);
-        nameC.value=p.name; nameC.font={size:9,color:{argb:C.grayText}};
-        nameC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-        nameC.alignment={vertical:'middle'};
-
         const v = p.attendance?.[d];
-        const attC = dRow.getCell(3+i*2+1);
+        const attC = dRow.getCell(3+i);
         attC.alignment={horizontal:'center',vertical:'middle'};
         if(v===1){
           attC.value='✓'; attC.font={bold:true,color:{argb:C.greenFg},size:13};
@@ -1673,7 +1654,7 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
         }
       });
 
-      const totC = dRow.getCell(3+meetingDates.length*2);
+      const totC = dRow.getCell(3+meetingDates.length);
       totC.value=`${total}/${meetingDates.length}`;
       totC.font={bold:true,color:{argb:C.blueMed}};
       totC.alignment={horizontal:'center',vertical:'middle'};
