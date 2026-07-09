@@ -2011,7 +2011,7 @@ function buildTISHTML(r) {
     </div>
   </div>`;
 
-  // Activities table — dates are editable
+  // Activities table — dept, responsable and dates are editable per-CI
   const tisActs = r.tisActivities || {};
   let actRows = '';
   TIS_ACTIVITIES.forEach((act, idx) => {
@@ -2025,11 +2025,13 @@ function buildTISHTML(r) {
       const ad = tisActs[idx] || {};
       const di = (val, key) =>
         `<input type="date" class="tis-date" value="${S(val||'')}" onchange="saveTISActivity(this,${idx},'${key}',${cid})" ${ro}>`;
+      const ti = (val, key, placeholder) =>
+        `<input class="tis-inp" value="${S(val||'')}" placeholder="${S(placeholder||'')}" onchange="saveTISActivity(this,${idx},'${key}',${cid})" ${ro}>`;
       actRows += `<tr style="background:${bg};">`+
         `<td style="${bdr}${pad}width:22px;"></td>`+
         `<td style="${bdr}${pad}${fn}${pw}">${S(act.b)}</td>`+
-        `<td style="${bdr}${pad}${fn}${pw}">${S(act.c)}</td>`+
-        `<td style="${bdr}${pad}${fn}${pw}">${S(act.d)}</td>`+
+        `<td style="${bdr}${pad}${fn}">${ti(ad.dept, 'dept', act.c)}</td>`+
+        `<td style="${bdr}${pad}${fn}">${ti(ad.resp, 'resp', act.d)}</td>`+
         `<td style="${bdr}padding:3px 5px;min-width:110px;">${di(ad.p,'p')}</td>`+
         `<td style="${bdr}padding:3px 5px;min-width:110px;">${di(ad.r,'r')}</td>`+
         `</tr>`;
@@ -2242,10 +2244,10 @@ async function exportTIS(id) {
           c.fill=fill(bg); c.border=bAll; c.font={size:10};
           c.alignment={vertical:'middle',wrapText:true};
         });
-        ws.getCell(`B${rn}`).value=act.b||'';
-        ws.getCell(`C${rn}`).value=act.c||'';
-        ws.getCell(`D${rn}`).value=act.d||'';
         const _ad=(r.tisActivities||{})[i]||{};
+        ws.getCell(`B${rn}`).value=act.b||'';
+        ws.getCell(`C${rn}`).value=_ad.dept||act.c||'';
+        ws.getCell(`D${rn}`).value=_ad.resp||act.d||'';
         if(_ad.p){const dP=new Date(_ad.p+'T12:00:00');ws.getCell(`E${rn}`).value=dP;ws.getCell(`E${rn}`).numFmt='dd/mm/yyyy';}
         if(_ad.r){const dR=new Date(_ad.r+'T12:00:00');ws.getCell(`F${rn}`).value=dR;ws.getCell(`F${rn}`).numFmt='dd/mm/yyyy';}
         if(act.f){
