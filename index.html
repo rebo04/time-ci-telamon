@@ -1358,73 +1358,73 @@ async function exportToExcel() {
       sh4.getCell(rowNum, 14).value = onTime ? 0 : 1;
     });
 
-    // ── Period tables start at row 56
+    // ── Resumen por Cliente tables start at row 56
     sh4.mergeCells('A54:H54');
     Object.assign(sh4.getCell('A54'), {
-      value:'Cambios por Período',
+      value:'Resumen por Cliente',
       font:{bold:true,size:14,color:{argb:C.white}},
       fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
       alignment:{horizontal:'center',vertical:'middle'}
     });
     sh4.getRow(54).height=36; sh4.getRow(55).height=8;
 
-    const monthData = buildMonthData(records);
-    const weekData  = buildWeekData(records);
-    const yearData  = buildYearData(records);
+    // Clasificación: verde = a tiempo, rojo = con retraso, amarillo = TBD (sin Fecha Real)
+    const catOf  = r => r.sopReal ? ((r.sopPlaneado && r.sopReal > r.sopPlaneado) ? 'rojo' : 'verde') : 'amarillo';
+    const dateOf = r => r.sopReal || r.sopPlaneado || '';
+    const wkOf = ds => { const d=new Date(ds+'T12:00:00'); const st=new Date(d.getFullYear(),0,1); return Math.ceil(((d-st)/86400000+st.getDay()+1)/7); };
+    const CUR_YEAR = String(new Date().getFullYear());
 
-    const G_DATA_START = 58; // section title=54, spacer=55, table titles=56, col headers=57, data starts at 58
-    function writePeriodTable4(col, titleText, hdrLabels, pd) {
-      const n = Math.min(pd.labels.length, 24);
-      sh4.mergeCells(56, col, 56, col+1);
-      const tC = sh4.getCell(56, col);
+    // Agrupar semana→cliente (año actual) y año→cliente (todos)
+    const wkMap = {}, yrMap = {};
+    records.forEach(r => {
+      const ds = dateOf(r); if (!ds) return;
+      const cli = r.platform || 'N/A';
+      const cat = catOf(r);
+      const yk = ds.slice(0,4) + '|' + cli;
+      (yrMap[yk] = yrMap[yk] || {verde:0,rojo:0,amarillo:0})[cat]++;
+      if (ds.startsWith(CUR_YEAR)) {
+        const wkk = String(wkOf(ds)).padStart(2,'0') + '|' + cli;
+        (wkMap[wkk] = wkMap[wkk] || {verde:0,rojo:0,amarillo:0})[cat]++;
+      }
+    });
+    const wkRows = Object.keys(wkMap).sort().map(k => {
+      const [wk, cli] = k.split('|');
+      return {outer:'Sem '+Number(wk), cli, ...wkMap[k]};
+    });
+    const yrRows = Object.keys(yrMap).sort().map(k => {
+      const [yr, cli] = k.split('|');
+      return {outer:yr, cli, ...yrMap[k]};
+    });
+
+    // Tabla: outer | Cliente | Fecha Planeada (verde) | Fecha Real (rojo) | TBD (amarillo)
+    function writeClientTable4(startRow, titleText, outerHdr, rows) {
+      sh4.mergeCells(startRow, 1, startRow, 5);
+      const tC = sh4.getCell(startRow, 1);
       tC.value=titleText; tC.font={bold:true,size:11,color:{argb:C.white}};
       tC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
       tC.alignment={horizontal:'center',vertical:'middle'};
-      [hdrLabels[0],hdrLabels[1]].forEach((h,i)=>{
-        const c=sh4.getCell(57,col+i);
+      [outerHdr,'Cliente','Fecha Planeada','Fecha Real','TBD'].forEach((h,i)=>{
+        const c=sh4.getCell(startRow+1, 1+i);
         c.value=h; c.font={bold:true,color:{argb:C.white},size:10};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
         c.alignment={horizontal:'center',vertical:'middle'};
       });
-      for(let i=0;i<n;i++){
-        const lC=sh4.getCell(G_DATA_START+i,col), vC=sh4.getCell(G_DATA_START+i,col+1);
-        lC.value=pd.labels[i]; vC.value=pd.data[i];
+      rows.forEach((rw,i)=>{
         const bg=i%2===0?C.gray:'FFFFFFFF';
-        lC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-        vC.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-        vC.alignment={horizontal:'center'};
-      }
-      sh4.getRow(56).height=20; sh4.getRow(57).height=18;
-      return G_DATA_START+n-1;
+        [rw.outer, rw.cli, rw.verde, rw.rojo, rw.amarillo].forEach((v,ci)=>{
+          const c=sh4.getCell(startRow+2+i, 1+ci);
+          c.value=v;
+          c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+          if (ci>=2) c.alignment={horizontal:'center'};
+        });
+      });
+      sh4.getRow(startRow).height=20; sh4.getRow(startRow+1).height=18;
+      return startRow+1+rows.length; // última fila con datos
     }
-    const lastMesRowG  = writePeriodTable4(1,'Cambios por Mes',    ['Mes','Total'],    monthData);
-    const lastSemRowG  = writePeriodTable4(4,'Cambios por Semana', ['Semana','Total'], weekData);
-    const lastAnoRowG  = writePeriodTable4(7,'Cambios por Año',    ['Año','Total'],    yearData);
-
-    // Period chart XML (reference Graficas sheet cells)
-    const periodBarXml = (title, catRef, valRef, color) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
-<c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
-<c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>
-<c:ser><c:idx val="0"/><c:order val="0"/>
-<c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr>
-<c:cat><c:strRef><c:f>${catRef}</c:f></c:strRef></c:cat>
-<c:val><c:numRef><c:f>${valRef}</c:f></c:numRef></c:val>
-</c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>
-<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
-<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:crossAx val="1"/></c:valAx>
-</c:plotArea><c:plotVisOnly val="1"/></c:chart>
-<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:chartSpace>`;
-
-    const CHART3_XML = periodBarXml('Cambios por Mes',
-      `&apos;Graficas&apos;!$A$${G_DATA_START}:$A$${lastMesRowG}`,
-      `&apos;Graficas&apos;!$B$${G_DATA_START}:$B$${lastMesRowG}`, '6366f1');
-    const CHART4_XML = periodBarXml('Cambios por Semana',
-      `&apos;Graficas&apos;!$D$${G_DATA_START}:$D$${lastSemRowG}`,
-      `&apos;Graficas&apos;!$E$${G_DATA_START}:$E$${lastSemRowG}`, '8b5cf6');
-    const CHART5_XML = periodBarXml('Cambios por Año',
-      `&apos;Graficas&apos;!$G$${G_DATA_START}:$G$${lastAnoRowG}`,
-      `&apos;Graficas&apos;!$H$${G_DATA_START}:$H$${lastAnoRowG}`, '22c55e');
+    const semStartG   = 56;
+    const lastSemRowG = writeClientTable4(semStartG,'Resumen por Cliente Semanal','Semana',wkRows);
+    const anoStartG   = lastSemRowG + 2;
+    const lastAnoRowG = writeClientTable4(anoStartG,'Resumen Anual por Cliente','Año',yrRows);
 
     // ── CHART6: Cambios de Ingeniería — stacked bar, multi-level x-axis (Mes/Célula/Plataforma/Semana)
     // Data lives in hidden cols I(9)–N(14), rows 3 to 2+n4
@@ -1482,22 +1482,66 @@ async function exportToExcel() {
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>
 </c:chartSpace>`;
 
-    // Drawing2: charts on Graficas sheet
-    // Period tables end at max row 81. CI chart: drawing rows 83-103. Period charts pushed down.
+    // ── CHART3/CHART4: Resumen por Cliente — barra apilada, eje multinivel (período→cliente),
+    // series verde (Fecha Planeada / a tiempo), rojo (Fecha Real / retraso), amarillo (TBD)
+    const stacked3Xml = (title, dataStart, lastRow, rows) => {
+      const n = rows.length;
+      const cat = n === 0 ? `<c:numRef><c:f>Graficas!$A$${dataStart}</c:f></c:numRef>` :
+        `<c:multiLvlStrRef>
+<c:f>&apos;Graficas&apos;!$A$${dataStart}:$B$${lastRow}</c:f>
+<c:multiLvlStrCache>
+<c:ptCount val="${n}"/>
+<c:lvl>${ptList(rows.map(x=>x.cli))}</c:lvl>
+<c:lvl>${ptList(rows.map(x=>x.outer))}</c:lvl>
+</c:multiLvlStrCache>
+</c:multiLvlStrRef>`;
+      const ser = (idx, name, color, col, vals) => `<c:ser>
+<c:idx val="${idx}"/><c:order val="${idx}"/>
+<c:tx><c:v>${name}</c:v></c:tx>
+<c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+<c:cat>${cat}</c:cat>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$${col}$${dataStart}:$${col}$${lastRow}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n}"/>${numPtList(vals)}</c:numCache></c:numRef></c:val>
+</c:ser>`;
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
+<c:chart>
+<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+<c:autoTitleDeleted val="0"/>
+<c:plotArea>
+<c:barChart>
+<c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
+${ser(0,'Fecha Planeada','22c55e','C',rows.map(x=>x.verde))}
+${ser(1,'Fecha Real','ef4444','D',rows.map(x=>x.rojo))}
+${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
+<c:overlap val="100"/>
+<c:axId val="21"/><c:axId val="22"/>
+</c:barChart>
+<c:catAx><c:axId val="21"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="22"/></c:catAx>
+<c:valAx><c:axId val="22"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:crossAx val="21"/></c:valAx>
+</c:plotArea>
+<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>
+<c:plotVisOnly val="1"/>
+</c:chart>
+<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>
+</c:chartSpace>`;
+    };
+    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows);
+    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows);
+
+    // Drawing2: charts on Graficas sheet — anclados debajo de la última tabla
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
 `<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
+    const gTop = Math.max(lastAnoRowG + 2, 83);
     const DRAWING2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
-${mkAnchor(0,8,83,103,1,'rId4')}
-${mkAnchor(0,4,105,123,2,'rId1')}
-${mkAnchor(4,8,105,123,3,'rId2')}
-${mkAnchor(0,4,125,143,4,'rId3')}
+${mkAnchor(0,8,gTop,gTop+20,1,'rId4')}
+${mkAnchor(0,8,gTop+22,gTop+42,2,'rId1')}
+${mkAnchor(0,8,gTop+44,gTop+64,3,'rId2')}
 </xdr:wsDr>`;
     const DRAWING2_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart3.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart4.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart5.xml"/>
 <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/chart6.xml"/>
 </Relationships>`;
 
@@ -1670,7 +1714,6 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
     excelZip.file('xl/charts/chart2.xml', CHART2_XML);
     excelZip.file('xl/charts/chart3.xml', CHART3_XML);
     excelZip.file('xl/charts/chart4.xml', CHART4_XML);
-    excelZip.file('xl/charts/chart5.xml', CHART5_XML);
     excelZip.file('xl/charts/chart6.xml', CHART6_XML);
     excelZip.file('xl/drawings/drawing1.xml', DRAWING1_XML);
     excelZip.file('xl/media/logo.png', LOGO_B64, {base64:true});
@@ -1716,7 +1759,6 @@ ${mkAnchor(0,4,125,143,4,'rId3')}
       '<Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Override PartName="/xl/charts/chart3.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Override PartName="/xl/charts/chart4.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
-      '<Override PartName="/xl/charts/chart5.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Override PartName="/xl/charts/chart6.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
       '<Default Extension="png" ContentType="image/png"/>',
     ];
