@@ -1315,7 +1315,7 @@ async function exportToExcel() {
     sh4.views = [{ showGridLines: false }];
     sh4.columns = [
       {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10},
-      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1}  // helper cols I–N for CI chart
+      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1},{width:1}  // helper cols I–O for CI chart
     ];
     // ── Resumen CI at top (2026 only)
     sh4.mergeCells(1, 1, 1, 7);
@@ -1329,33 +1329,42 @@ async function exportToExcel() {
     const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
     RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
     sh4.getRow(2).height = 18;
-    // Series label headers for chart (hidden cols M=13, N=14)
+    // Series label headers for chart (hidden cols M=13, N=14, O=15)
     sh4.getCell(2, 13).value = 'Fecha Planeada - 2026';
     sh4.getCell(2, 14).value = 'Fecha real - 2026';
+    sh4.getCell(2, 15).value = 'TBD - 2026';
+    // Incluye completados (por Fecha Real) y pendientes sin Fecha Real (por Fecha Planeada) del 2026
+    const ciDate4 = r => r.sopReal || r.sopPlaneado || '';
     const completedR4 = records
-      .filter(r => r.sopReal && r.sopReal.startsWith('2026'))
-      .sort((a,b) => (a.sopReal||'').localeCompare(b.sopReal||''));
+      .filter(r => ciDate4(r).startsWith('2026'))
+      .sort((a,b) => ciDate4(a).localeCompare(ciDate4(b)));
+    const YEL_BG='FFfef9c3', YEL_FG='FFa16207';
     completedR4.forEach((r, i) => {
-      const onTime = r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
+      const tbd = !r.sopReal;
+      const onTime = !tbd && r.sopPlaneado && r.sopReal <= r.sopPlaneado;
       const row = sh4.getRow(3 + i);
       const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
-      const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
+      const etBg = tbd ? YEL_BG : (onTime ? C.greenBg : C.redBg);
+      const etFg = tbd ? YEL_FG : (onTime ? C.greenFg : C.redFg);
+      const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', tbd?'TBD':(onTime?'Sí':'No'), r.issue||'', r.accionCorr||''];
       cells.forEach((v, ci) => {
         const cell = row.getCell(ci + 1);
         cell.value = v;
-        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
-        cell.font = ci===4 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
+        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? etBg : bg}};
+        cell.font = ci===4 ? {bold:true, color:{argb: etFg}} : {};
         cell.alignment = {wrapText:true, vertical:'top'};
         if (ci >= 5) row.height = Math.max(row.height||15, Math.ceil((v.length||0)/55)*15);
       });
-      // Helper cols for CI chart: I(9)=Mes J(10)=Célula K(11)=Plataforma L(12)=Semana M(13)=OnTime N(14)=Delayed
+      // Helper cols for CI chart: I(9)=Mes J(10)=Célula K(11)=Plataforma L(12)=Semana M(13)=OnTime N(14)=Delayed O(15)=TBD
       const rowNum = 3 + i;
-      sh4.getCell(rowNum, 9).value  = calcMes(r)||'';
+      const mesD = ciDate4(r);
+      sh4.getCell(rowNum, 9).value  = mesD ? MONTH_SHORT[new Date(mesD+'T12:00:00').getMonth()] : '';
       sh4.getCell(rowNum, 10).value = r.cell||'';
       sh4.getCell(rowNum, 11).value = r.platform||'';
       sh4.getCell(rowNum, 12).value = String(r.id||'');
-      sh4.getCell(rowNum, 13).value = onTime ? 1 : 0;
-      sh4.getCell(rowNum, 14).value = onTime ? 0 : 1;
+      sh4.getCell(rowNum, 13).value = (!tbd && onTime) ? 1 : 0;
+      sh4.getCell(rowNum, 14).value = (!tbd && !onTime) ? 1 : 0;
+      sh4.getCell(rowNum, 15).value = tbd ? 1 : 0;
     });
 
     // ── Resumen por Cliente tables start at row 56
@@ -1427,17 +1436,18 @@ async function exportToExcel() {
     const lastAnoRowG = writeClientTable4(anoStartG,'Resumen Anual por Cliente','Año',yrRows);
 
     // ── CHART6: Cambios de Ingeniería — stacked bar, multi-level x-axis (Mes/Célula/Plataforma/Semana)
-    // Data lives in hidden cols I(9)–N(14), rows 3 to 2+n4
+    // Data lives in hidden cols I(9)–O(15), rows 3 to 2+n4
     const n4 = completedR4.length;
     const xmlEsc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const ptList = (arr) => arr.map((v,i) => `<c:pt idx="${i}"><c:v>${xmlEsc(v)}</c:v></c:pt>`).join('');
     const numPtList = (arr) => arr.map((v,i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join('');
-    const mesLvl   = completedR4.map(r => calcMes(r)||'');
+    const mesLvl   = completedR4.map(r => { const d=ciDate4(r); return d ? MONTH_SHORT[new Date(d+'T12:00:00').getMonth()] : ''; });
     const celLvl   = completedR4.map(r => r.cell||'');
     const platLvl  = completedR4.map(r => r.platform||'');
     const idLvl    = completedR4.map(r => String(r.id||''));
     const onTimeV  = completedR4.map(r => (r.sopReal && r.sopPlaneado && r.sopReal <= r.sopPlaneado) ? 1 : 0);
-    const delayedV = onTimeV.map(v => 1 - v);
+    const delayedV = completedR4.map((r,i) => r.sopReal ? 1 - onTimeV[i] : 0);
+    const tbdV     = completedR4.map(r => r.sopReal ? 0 : 1);
     const lastRow4 = 2 + n4;
     const multiLvlCat = n4 === 0 ? '<c:numRef><c:f>Graficas!$I$3</c:f></c:numRef>' :
       `<c:multiLvlStrRef>
@@ -1471,6 +1481,13 @@ async function exportToExcel() {
 <c:spPr><a:solidFill><a:srgbClr val="ef4444"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$3:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
+</c:ser>
+<c:ser>
+<c:idx val="2"/><c:order val="2"/>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$O$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>TBD - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:spPr><a:solidFill><a:srgbClr val="eab308"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+<c:cat>${multiLvlCat}</c:cat>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$O$3:$O$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(tbdV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:axId val="11"/><c:axId val="12"/>
 </c:barChart>
