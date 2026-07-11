@@ -1317,7 +1317,7 @@ async function exportToExcel() {
       {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10},
       {width:1},{width:1},{width:1},{width:1},{width:1},{width:1},{width:1}  // helper cols I–O for CI chart
     ];
-    // ── Resumen CI at top (2026 only)
+    // ── Resumen CI at top (año actual + CIs sin fecha)
     sh4.mergeCells(1, 1, 1, 7);
     Object.assign(sh4.getCell(1, 1), {
       value: 'Resumen de Cambios de Ingeniería',
@@ -1330,14 +1330,17 @@ async function exportToExcel() {
     RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
     sh4.getRow(2).height = 18;
     // Series label headers for chart (hidden cols M=13, N=14, O=15)
-    sh4.getCell(2, 13).value = 'Fecha Planeada - 2026';
-    sh4.getCell(2, 14).value = 'Fecha real - 2026';
-    sh4.getCell(2, 15).value = 'TBD - 2026';
-    // Incluye completados (por Fecha Real) y pendientes sin Fecha Real (por Fecha Planeada) del 2026
+    const CUR_YEAR = String(new Date().getFullYear());
+    sh4.getCell(2, 13).value = 'Fecha Planeada - ' + CUR_YEAR;
+    sh4.getCell(2, 14).value = 'Fecha real - ' + CUR_YEAR;
+    sh4.getCell(2, 15).value = 'TBD - ' + CUR_YEAR;
+    // Incluye: completados (por Fecha Real) y pendientes (por Fecha Planeada) del año actual,
+    // más los CIs sin ninguna fecha al final (grupo "Sin fecha")
     const ciDate4 = r => r.sopReal || r.sopPlaneado || '';
     const completedR4 = records
-      .filter(r => ciDate4(r).startsWith('2026'))
-      .sort((a,b) => ciDate4(a).localeCompare(ciDate4(b)));
+      .filter(r => ciDate4(r).startsWith(CUR_YEAR) || !ciDate4(r))
+      .sort((a,b) => (ciDate4(a)||'9999').localeCompare(ciDate4(b)||'9999'));
+    const mesOf4 = r => { const d=ciDate4(r); return d ? MONTH_SHORT[new Date(d+'T12:00:00').getMonth()] : 'Sin fecha'; };
     const YEL_BG='FFfef9c3', YEL_FG='FFa16207';
     completedR4.forEach((r, i) => {
       const tbd = !r.sopReal;
@@ -1357,8 +1360,7 @@ async function exportToExcel() {
       });
       // Helper cols for CI chart: I(9)=Mes J(10)=Célula K(11)=Plataforma L(12)=Semana M(13)=OnTime N(14)=Delayed O(15)=TBD
       const rowNum = 3 + i;
-      const mesD = ciDate4(r);
-      sh4.getCell(rowNum, 9).value  = mesD ? MONTH_SHORT[new Date(mesD+'T12:00:00').getMonth()] : '';
+      sh4.getCell(rowNum, 9).value  = mesOf4(r);
       sh4.getCell(rowNum, 10).value = r.cell||'';
       sh4.getCell(rowNum, 11).value = r.platform||'';
       sh4.getCell(rowNum, 12).value = String(r.id||'');
@@ -1367,38 +1369,39 @@ async function exportToExcel() {
       sh4.getCell(rowNum, 15).value = tbd ? 1 : 0;
     });
 
-    // ── Resumen por Cliente tables start at row 56
-    sh4.mergeCells('A54:H54');
-    Object.assign(sh4.getCell('A54'), {
+    // ── Resumen por Cliente — la sección empieza justo después de la tabla CI (posición dinámica)
+    const cliTitleRow = 3 + completedR4.length + 1;
+    sh4.mergeCells(cliTitleRow, 1, cliTitleRow, 8);
+    Object.assign(sh4.getCell(cliTitleRow, 1), {
       value:'Resumen por Cliente',
       font:{bold:true,size:14,color:{argb:C.white}},
       fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
       alignment:{horizontal:'center',vertical:'middle'}
     });
-    sh4.getRow(54).height=36; sh4.getRow(55).height=8;
+    sh4.getRow(cliTitleRow).height=36; sh4.getRow(cliTitleRow+1).height=8;
 
     // Clasificación: verde = a tiempo, rojo = con retraso, amarillo = TBD (sin Fecha Real)
     const catOf  = r => r.sopReal ? ((r.sopPlaneado && r.sopReal > r.sopPlaneado) ? 'rojo' : 'verde') : 'amarillo';
-    const dateOf = r => r.sopReal || r.sopPlaneado || '';
     const wkOf = ds => { const d=new Date(ds+'T12:00:00'); const st=new Date(d.getFullYear(),0,1); return Math.ceil(((d-st)/86400000+st.getDay()+1)/7); };
-    const CUR_YEAR = String(new Date().getFullYear());
 
-    // Agrupar semana→cliente (año actual) y año→cliente (todos)
+    // Agrupar semana→cliente (año actual) y año→cliente (todos; sin fecha → grupo "Sin fecha")
     const wkMap = {}, yrMap = {};
     records.forEach(r => {
-      const ds = dateOf(r); if (!ds) return;
+      const ds = ciDate4(r);
       const cli = r.platform || 'N/A';
       const cat = catOf(r);
-      const yk = ds.slice(0,4) + '|' + cli;
+      const yk = (ds ? ds.slice(0,4) : 'Sin fecha') + '|' + cli;
       (yrMap[yk] = yrMap[yk] || {verde:0,rojo:0,amarillo:0})[cat]++;
       if (ds.startsWith(CUR_YEAR)) {
         const wkk = String(wkOf(ds)).padStart(2,'0') + '|' + cli;
         (wkMap[wkk] = wkMap[wkk] || {verde:0,rojo:0,amarillo:0})[cat]++;
+      } else if (!ds) {
+        (wkMap['99|' + cli] = wkMap['99|' + cli] || {verde:0,rojo:0,amarillo:0})[cat]++;
       }
     });
     const wkRows = Object.keys(wkMap).sort().map(k => {
       const [wk, cli] = k.split('|');
-      return {outer:'Sem '+Number(wk), cli, ...wkMap[k]};
+      return {outer: wk==='99' ? 'Sin fecha' : 'Sem '+Number(wk), cli, ...wkMap[k]};
     });
     const yrRows = Object.keys(yrMap).sort().map(k => {
       const [yr, cli] = k.split('|');
@@ -1430,7 +1433,7 @@ async function exportToExcel() {
       sh4.getRow(startRow).height=20; sh4.getRow(startRow+1).height=18;
       return startRow+1+rows.length; // última fila con datos
     }
-    const semStartG   = 56;
+    const semStartG   = cliTitleRow + 2;
     const lastSemRowG = writeClientTable4(semStartG,'Resumen por Cliente Semanal','Semana',wkRows);
     const anoStartG   = lastSemRowG + 2;
     const lastAnoRowG = writeClientTable4(anoStartG,'Resumen Anual por Cliente','Año',yrRows);
@@ -1441,7 +1444,7 @@ async function exportToExcel() {
     const xmlEsc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const ptList = (arr) => arr.map((v,i) => `<c:pt idx="${i}"><c:v>${xmlEsc(v)}</c:v></c:pt>`).join('');
     const numPtList = (arr) => arr.map((v,i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join('');
-    const mesLvl   = completedR4.map(r => { const d=ciDate4(r); return d ? MONTH_SHORT[new Date(d+'T12:00:00').getMonth()] : ''; });
+    const mesLvl   = completedR4.map(mesOf4);
     const celLvl   = completedR4.map(r => r.cell||'');
     const platLvl  = completedR4.map(r => r.platform||'');
     const idLvl    = completedR4.map(r => String(r.id||''));
@@ -1470,21 +1473,21 @@ async function exportToExcel() {
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
 <c:ser>
 <c:idx val="0"/><c:order val="0"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="22c55e"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$3:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:ser>
 <c:idx val="1"/><c:order val="1"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="ef4444"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$3:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:ser>
 <c:idx val="2"/><c:order val="2"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$O$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>TBD - 2026</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$O$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>TBD - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="eab308"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$O$3:$O$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(tbdV)}</c:numCache></c:numRef></c:val>
