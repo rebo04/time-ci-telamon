@@ -1317,22 +1317,28 @@ async function exportToExcel() {
       {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10},
       {width:1},{width:1},{width:1},{width:1},{width:1},{width:1},{width:1}  // helper cols I–O for CI chart
     ];
-    // ── Resumen CI at top (año actual + CIs sin fecha)
-    sh4.mergeCells(1, 1, 1, 7);
-    Object.assign(sh4.getCell(1, 1), {
+    // ── Layout: cada gráfica arriba y su tabla de datos abajo (chart → datos, ×3)
+    const CHART_ROWS = 20;  // filas que ocupa cada gráfica
+    const GAP = 2;          // filas en blanco entre secciones
+    // ── Sección 1: Resumen CI (la gráfica va arriba, la tabla debajo)
+    const ciTitleRow  = CHART_ROWS + GAP + 1;  // fila del título de la tabla CI
+    const ciHdrRow    = ciTitleRow + 1;        // fila de encabezados
+    const ciDataStart = ciTitleRow + 2;        // primera fila de datos
+    sh4.mergeCells(ciTitleRow, 1, ciTitleRow, 7);
+    Object.assign(sh4.getCell(ciTitleRow, 1), {
       value: 'Resumen de Cambios de Ingeniería',
       font: {bold:true, size:14, color:{argb:C.white}},
       fill: {type:'pattern', pattern:'solid', fgColor:{argb:C.blueDark}},
       alignment: {horizontal:'center', vertical:'middle'}
     });
-    sh4.getRow(1).height = 36;
+    sh4.getRow(ciTitleRow).height = 36;
     const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
-    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(2, i + 1), h));
-    sh4.getRow(2).height = 18;
+    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(ciHdrRow, i + 1), h));
+    sh4.getRow(ciHdrRow).height = 18;
     // Series label headers for chart (hidden cols M=13, N=14)
     const CUR_YEAR = String(new Date().getFullYear());
-    sh4.getCell(2, 13).value = 'Fecha Planeada - ' + CUR_YEAR;
-    sh4.getCell(2, 14).value = 'Fecha real - ' + CUR_YEAR;
+    sh4.getCell(ciHdrRow, 13).value = 'Fecha Planeada - ' + CUR_YEAR;
+    sh4.getCell(ciHdrRow, 14).value = 'Fecha real - ' + CUR_YEAR;
     const ciDate4 = r => r.sopReal || r.sopPlaneado || '';
     // Tabla Resumen: solo CIs completados (con Fecha Real) del año actual
     const completedR4 = records
@@ -1340,7 +1346,7 @@ async function exportToExcel() {
       .sort((a,b) => a.sopReal.localeCompare(b.sopReal));
     completedR4.forEach((r, i) => {
       const onTime = r.sopPlaneado && r.sopReal <= r.sopPlaneado;
-      const row = sh4.getRow(3 + i);
+      const row = sh4.getRow(ciDataStart + i);
       const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
       const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
       cells.forEach((v, ci) => {
@@ -1366,7 +1372,7 @@ async function exportToExcel() {
       (Number(a.sem)-Number(b.sem)) || a.plat.localeCompare(b.plat) || a.cel.localeCompare(b.cel));
     // Helper cols for CI chart (una fila por barra): I(9)=Semana J(10)=Plataforma K(11)=Célula L(12)=Mes M(13)=A tiempo N(14)=Retraso
     ciGroups.forEach((g, i) => {
-      const rowNum = 3 + i;
+      const rowNum = ciDataStart + i;
       sh4.getCell(rowNum, 9).value  = g.sem;
       sh4.getCell(rowNum, 10).value = g.plat;
       sh4.getCell(rowNum, 11).value = g.cel;
@@ -1375,8 +1381,11 @@ async function exportToExcel() {
       sh4.getCell(rowNum, 14).value = g.late;
     });
 
-    // ── Resumen por Cliente — la sección empieza justo después de la tabla CI (posición dinámica)
-    const cliTitleRow = 3 + completedR4.length + 1;
+    // ── Fin del bloque CI: la tabla visible y las columnas ocultas de la gráfica pueden tener
+    // distinto largo; tomamos la más larga para saber dónde termina el bloque.
+    const ciBlockEnd = ciDataStart + Math.max(completedR4.length, ciGroups.length) - 1;
+    // ── Resumen por Cliente — título general, debajo del bloque CI (gráfica + tabla)
+    const cliTitleRow = ciBlockEnd + GAP;
     sh4.mergeCells(cliTitleRow, 1, cliTitleRow, 8);
     Object.assign(sh4.getCell(cliTitleRow, 1), {
       value:'Resumen por Cliente',
@@ -1437,9 +1446,13 @@ async function exportToExcel() {
       sh4.getRow(startRow).height=20; sh4.getRow(startRow+1).height=18;
       return startRow+1+rows.length; // última fila con datos
     }
-    const semStartG   = cliTitleRow + 2;
+    // Sección Semanal: gráfica arriba (chart3Top) y su tabla debajo
+    const chart3Top   = cliTitleRow + 2;                  // filas en blanco donde se ancla la gráfica semanal
+    const semStartG   = chart3Top + CHART_ROWS + GAP;     // título de la tabla semanal
     const lastSemRowG = writeClientTable4(semStartG,'Resumen por Cliente Semanal','Semana',wkRows);
-    const anoStartG   = lastSemRowG + 2;
+    // Sección Anual: gráfica arriba (chart4Top) y su tabla debajo
+    const chart4Top   = lastSemRowG + GAP;                // filas en blanco donde se ancla la gráfica anual
+    const anoStartG   = chart4Top + CHART_ROWS + GAP;     // título de la tabla anual
     const lastAnoRowG = writeClientTable4(anoStartG,'Resumen Anual por Cliente','Año',yrRows);
 
     // ── CHART6: Cambios de Ingeniería — barra agregada por grupo, eje multinivel (Semana/Plataforma/Célula/Mes)
@@ -1454,12 +1467,12 @@ async function exportToExcel() {
     const semLvl   = ciGroups.map(g => g.sem);
     const onTimeV  = ciGroups.map(g => g.onTime);
     const delayedV = ciGroups.map(g => g.late);
-    const lastRow4 = 2 + n4;
+    const lastRow4 = ciDataStart + n4 - 1;
     // Etiquetas de datos: solo se muestra el conteo cuando es > 0 (formato "0;;;")
     const DLBLS = `<c:dLbls><c:numFmt formatCode="0;;;" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr b="1"/></a:pPr><a:endParaRPr lang="es-MX"/></a:p></c:txPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
     const multiLvlCat = n4 === 0 ? '<c:numRef><c:f>Graficas!$I$3</c:f></c:numRef>' :
       `<c:multiLvlStrRef>
-<c:f>&apos;Graficas&apos;!$I$3:$L$${lastRow4}</c:f>
+<c:f>&apos;Graficas&apos;!$I$${ciDataStart}:$L$${lastRow4}</c:f>
 <c:multiLvlStrCache>
 <c:ptCount val="${n4}"/>
 <c:lvl>${ptList(mesLvl)}</c:lvl>
@@ -1482,7 +1495,7 @@ async function exportToExcel() {
 <c:spPr><a:solidFill><a:srgbClr val="22c55e"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
-<c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$3:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$${ciDataStart}:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:ser>
 <c:idx val="1"/><c:order val="1"/>
@@ -1490,12 +1503,12 @@ ${DLBLS}
 <c:spPr><a:solidFill><a:srgbClr val="ef4444"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
-<c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$3:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$${ciDataStart}:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:axId val="11"/><c:axId val="12"/>
 </c:barChart>
 <c:catAx><c:axId val="11"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="12"/></c:catAx>
-<c:valAx><c:axId val="12"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:majorUnit val="0.5"/><c:numFmt formatCode="General" sourceLinked="1"/><c:crossAx val="11"/></c:valAx>
+<c:valAx><c:axId val="12"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:majorUnit val="1"/><c:numFmt formatCode="0" sourceLinked="0"/><c:crossAx val="11"/></c:valAx>
 </c:plotArea>
 <c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>
 <c:plotVisOnly val="1"/>
@@ -1538,7 +1551,7 @@ ${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
 <c:axId val="21"/><c:axId val="22"/>
 </c:barChart>
 <c:catAx><c:axId val="21"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="22"/></c:catAx>
-<c:valAx><c:axId val="22"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:crossAx val="21"/></c:valAx>
+<c:valAx><c:axId val="22"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:majorUnit val="1"/><c:numFmt formatCode="0" sourceLinked="0"/><c:crossAx val="21"/></c:valAx>
 </c:plotArea>
 <c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>
 <c:plotVisOnly val="1"/>
@@ -1552,12 +1565,13 @@ ${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
     // Drawing2: charts on Graficas sheet — anclados debajo de la última tabla
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
 `<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
-    const gTop = Math.max(lastAnoRowG + 2, 83);
+    // Cada gráfica se ancla en las filas en blanco justo arriba de su tabla.
+    // Las filas del dibujo son base-0 (fila de la hoja - 1).
     const DRAWING2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
-${mkAnchor(0,8,gTop,gTop+20,1,'rId4')}
-${mkAnchor(0,8,gTop+22,gTop+42,2,'rId1')}
-${mkAnchor(0,8,gTop+44,gTop+64,3,'rId2')}
+${mkAnchor(0,8,0,CHART_ROWS,1,'rId4')}
+${mkAnchor(0,8,chart3Top-1,chart3Top-1+CHART_ROWS,2,'rId1')}
+${mkAnchor(0,8,chart4Top-1,chart4Top-1+CHART_ROWS,3,'rId2')}
 </xdr:wsDr>`;
     const DRAWING2_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
