@@ -1426,17 +1426,31 @@ async function exportToExcel() {
     });
     const yrRows = Object.keys(yrMap).sort().map(k => {
       const [yr, cli] = k.split('|');
-      return {outer:yr, cli, ...yrMap[k]};
+      const m = yrMap[k];
+      // 'real' = todos los CIs con Fecha Real (a tiempo + con retraso)
+      return {outer:yr, cli, ...m, real: m.verde + m.rojo};
     });
 
-    // Tabla: outer | Cliente | Fecha Planeada (verde) | Fecha Real (rojo) | TBD (amarillo)
-    function writeClientTable4(startRow, C0, titleText, outerHdr, rows) {
-      sh4.mergeCells(startRow, C0, startRow, C0 + 4);
+    // Columnas de datos de cada resumen (configurable): { hdr, key, name, color }
+    // Semanal: 3 series (Fecha Planeada / Fecha Real / TBD)
+    const WEEK_COLS = [
+      {hdr:'Fecha Planeada', key:'verde',    name:'Fecha Planeada', color:'0070C0'},
+      {hdr:'Fecha Real',     key:'rojo',     name:'Fecha Real',     color:'92D050'},
+      {hdr:'TBD',            key:'amarillo', name:'TBD',            color:'eab308'},
+    ];
+    // Anual: 2 series (Fecha Real = todos los completados, y TBD)
+    const YEAR_COLS = [
+      {hdr:'Fecha Real', key:'real',     name:'Fecha Real', color:'92D050'},
+      {hdr:'TBD',        key:'amarillo', name:'TBD',        color:'eab308'},
+    ];
+    // Tabla: outer | Cliente | ...cols
+    function writeClientTable4(startRow, C0, titleText, outerHdr, rows, cols) {
+      sh4.mergeCells(startRow, C0, startRow, C0 + 1 + cols.length);
       const tC = sh4.getCell(startRow, C0);
       tC.value=titleText; tC.font={bold:true,size:11,color:{argb:C.white}};
       tC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
       tC.alignment={horizontal:'center',vertical:'middle'};
-      [outerHdr,'Cliente','Fecha Planeada','Fecha Real','TBD'].forEach((h,i)=>{
+      [outerHdr,'Cliente',...cols.map(c=>c.hdr)].forEach((h,i)=>{
         const c=sh4.getCell(startRow+1, C0+i);
         c.value=h; c.font={bold:true,color:{argb:C.white},size:10};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
@@ -1444,7 +1458,7 @@ async function exportToExcel() {
       });
       rows.forEach((rw,i)=>{
         const bg=i%2===0?C.gray:'FFFFFFFF';
-        [rw.outer, rw.cli, rw.verde, rw.rojo, rw.amarillo].forEach((v,ci)=>{
+        [rw.outer, rw.cli, ...cols.map(c=>rw[c.key])].forEach((v,ci)=>{
           const c=sh4.getCell(startRow+2+i, C0+ci);
           c.value=v;
           c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
@@ -1458,12 +1472,12 @@ async function exportToExcel() {
     const SEM_C0      = 6;
     const semGChartTop= 1;                                // fila (0-based en drawing) donde se ancla la gráfica semanal
     const semStartG   = ciTitleRow;                       // título tabla semanal alineado con tabla CI (fila 23)
-    const lastSemRowG = writeClientTable4(semStartG, SEM_C0, 'Resumen por Cliente Semanal','Semana',wkRows);
+    const lastSemRowG = writeClientTable4(semStartG, SEM_C0, 'Resumen por Cliente Semanal','Semana',wkRows, WEEK_COLS);
     // ── IZQUIERDA: Anual debajo de la tabla semanal, en cols A-E (C0=1)
     const ANO_C0      = 1;
     const chart4Top   = lastSemRowG + GAP + 1;            // filas en blanco donde se ancla la gráfica anual
     const anoStartG   = chart4Top + CHART_ROWS + GAP;     // título de la tabla anual
-    const lastAnoRowG = writeClientTable4(anoStartG, ANO_C0, 'Resumen Anual por Cliente','Año',yrRows);
+    const lastAnoRowG = writeClientTable4(anoStartG, ANO_C0, 'Resumen Anual por Cliente','Año',yrRows, YEAR_COLS);
 
     // ── CHART6: Resumen por celula mensual — barra agregada por grupo, eje multinivel (Mes/Célula/Plataforma/Semana)
     // Data lives in hidden cols W(23)–AB(28), una fila por barra
@@ -1538,9 +1552,9 @@ ${DLBLS}
     // ── CHART3/CHART4: Resumen por Cliente — barra apilada, eje multinivel (período→cliente),
     // series verde (Fecha Planeada / a tiempo), rojo (Fecha Real / retraso), amarillo (TBD)
     const colL = n => { let s=''; while(n>0){ s=String.fromCharCode(65+(n-1)%26)+s; n=Math.floor((n-1)/26); } return s; };
-    const stacked3Xml = (title, dataStart, lastRow, rows, C0) => {
+    const stacked3Xml = (title, dataStart, lastRow, rows, C0, cols) => {
       const n = rows.length;
-      const cOuter=colL(C0), cCli=colL(C0+1), cV=colL(C0+2), cR=colL(C0+3), cA=colL(C0+4);
+      const cOuter=colL(C0), cCli=colL(C0+1);
       const cat = n === 0 ? `<c:numRef><c:f>Graficas!$${cOuter}$${dataStart}</c:f></c:numRef>` :
         `<c:multiLvlStrRef>
 <c:f>&apos;Graficas&apos;!$${cOuter}$${dataStart}:$${cCli}$${lastRow}</c:f>
@@ -1565,9 +1579,7 @@ ${DLBLS}
 <c:plotArea>
 <c:barChart>
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
-${ser(0,'Fecha Planeada','0070C0',cV,rows.map(x=>x.verde))}
-${ser(1,'Fecha Real','92D050',cR,rows.map(x=>x.rojo))}
-${ser(2,'TBD','eab308',cA,rows.map(x=>x.amarillo))}
+${cols.map((c,i)=>ser(i,c.name,c.color,colL(C0+2+i),rows.map(x=>x[c.key]))).join('\n')}
 <c:overlap val="100"/>
 <c:axId val="21"/><c:axId val="22"/>
 </c:barChart>
@@ -1580,8 +1592,8 @@ ${ser(2,'TBD','eab308',cA,rows.map(x=>x.amarillo))}
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>
 </c:chartSpace>`;
     };
-    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows, SEM_C0);
-    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows, ANO_C0);
+    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows, SEM_C0, WEEK_COLS);
+    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows, ANO_C0, YEAR_COLS);
 
     // Drawing2: charts on Graficas sheet — anclados debajo de la última tabla
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
