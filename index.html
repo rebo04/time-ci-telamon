@@ -1314,18 +1314,26 @@ async function exportToExcel() {
     const sh4 = wb.addWorksheet('Graficas');
     sh4.views = [{ showGridLines: false }];
     sh4.columns = [
-      {width:18},{width:16},{width:16},{width:18},{width:12},{width:40},{width:40},{width:10},
-      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1},{width:1}  // helper cols I–O for CI chart
+      {width:16},{width:16},{width:14},{width:14},{width:10},   // A-E  tabla Anual
+      {width:16},{width:16},{width:14},{width:14},{width:10},   // F-J  tabla Semanal
+      {width:3},{width:3},{width:3},{width:3},                  // K-N  espaciador
+      {width:12},{width:16},{width:13},{width:13},{width:10},{width:40},{width:40}, // O-U tabla CI
+      {width:2},                                                // V    espaciador
+      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1} // W-AB datos ocultos gráfica CI
     ];
-    // ── Layout: cada gráfica arriba y su tabla de datos abajo (chart → datos, ×3)
+    // ── Layout de 2 columnas (como el Excel de referencia):
+    //   IZQUIERDA (A-J): gráfica Semanal arriba + tabla Semanal, luego gráfica Anual + tabla Anual
+    //   DERECHA  (O-U):  gráfica "Resumen por celula mensual" arriba + tabla CI; datos ocultos en W-AB
     const CHART_ROWS = 20;  // filas que ocupa cada gráfica
     const GAP = 2;          // filas en blanco entre secciones
-    // ── Sección 1: Resumen CI (la gráfica va arriba, la tabla debajo)
-    const ciTitleRow  = CHART_ROWS + GAP + 1;  // fila del título de la tabla CI
+    // ── Columna DERECHA: Resumen de Cambios de Ingeniería (tabla CI en O-U)
+    const CI_C0       = 15;                     // primera columna de la tabla CI (O)
+    const HLP0        = 23;                     // primera columna de datos ocultos (W)
+    const ciTitleRow  = CHART_ROWS + GAP + 1;  // fila del título de la tabla CI (23)
     const ciHdrRow    = ciTitleRow + 1;        // fila de encabezados
     const ciDataStart = ciTitleRow + 2;        // primera fila de datos
-    sh4.mergeCells(ciTitleRow, 1, ciTitleRow, 7);
-    Object.assign(sh4.getCell(ciTitleRow, 1), {
+    sh4.mergeCells(ciTitleRow, CI_C0, ciTitleRow, CI_C0 + 6);
+    Object.assign(sh4.getCell(ciTitleRow, CI_C0), {
       value: 'Resumen de Cambios de Ingeniería',
       font: {bold:true, size:14, color:{argb:C.white}},
       fill: {type:'pattern', pattern:'solid', fgColor:{argb:C.blueDark}},
@@ -1333,12 +1341,12 @@ async function exportToExcel() {
     });
     sh4.getRow(ciTitleRow).height = 36;
     const RHdrs4 = ['Célula','Plataforma','SOP Planeado','SOP Real','En Tiempo','Issue','Acción Correctiva'];
-    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(ciHdrRow, i + 1), h));
+    RHdrs4.forEach((h, i) => hdrCell(sh4.getCell(ciHdrRow, CI_C0 + i), h));
     sh4.getRow(ciHdrRow).height = 18;
-    // Series label headers for chart (hidden cols M=13, N=14)
+    // Etiquetas de serie para la gráfica CI (celdas ocultas AA2=27, AB2=28)
     const CUR_YEAR = String(new Date().getFullYear());
-    sh4.getCell(ciHdrRow, 13).value = 'Fecha Planeada - ' + CUR_YEAR;
-    sh4.getCell(ciHdrRow, 14).value = 'Fecha real - ' + CUR_YEAR;
+    sh4.getCell(2, HLP0 + 4).value = 'Fecha Planeada - ' + CUR_YEAR;
+    sh4.getCell(2, HLP0 + 5).value = 'Fecha real - ' + CUR_YEAR;
     const ciDate4 = r => r.sopReal || r.sopPlaneado || '';
     // Tabla Resumen: solo CIs completados (con Fecha Real) del año actual
     const completedR4 = records
@@ -1350,7 +1358,7 @@ async function exportToExcel() {
       const bg = i % 2 === 0 ? C.gray : 'FFFFFFFF';
       const cells = [r.cell||'', r.platform||'', r.sopPlaneado||'', r.sopReal||'', onTime?'Sí':'No', r.issue||'', r.accionCorr||''];
       cells.forEach((v, ci) => {
-        const cell = row.getCell(ci + 1);
+        const cell = row.getCell(CI_C0 + ci);
         cell.value = v;
         cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: ci===4 ? (onTime?C.greenBg:C.redBg) : bg}};
         cell.font = ci===4 ? {bold:true, color:{argb: onTime?C.greenFg:C.redFg}} : {};
@@ -1370,30 +1378,16 @@ async function exportToExcel() {
     });
     const ciGroups = [...gMap.values()].sort((a,b) =>
       (Number(a.sem)-Number(b.sem)) || a.plat.localeCompare(b.plat) || a.cel.localeCompare(b.cel));
-    // Helper cols for CI chart (una fila por barra): I(9)=Semana J(10)=Plataforma K(11)=Célula L(12)=Mes M(13)=A tiempo N(14)=Retraso
+    // Helper cols ocultos para la gráfica CI (una fila por barra): W=Semana X=Plataforma Y=Célula Z=Mes AA=A tiempo AB=Retraso
     ciGroups.forEach((g, i) => {
       const rowNum = ciDataStart + i;
-      sh4.getCell(rowNum, 9).value  = g.sem;
-      sh4.getCell(rowNum, 10).value = g.plat;
-      sh4.getCell(rowNum, 11).value = g.cel;
-      sh4.getCell(rowNum, 12).value = g.mes;
-      sh4.getCell(rowNum, 13).value = g.onTime;
-      sh4.getCell(rowNum, 14).value = g.late;
+      sh4.getCell(rowNum, HLP0    ).value = g.sem;    // W
+      sh4.getCell(rowNum, HLP0 + 1).value = g.plat;   // X
+      sh4.getCell(rowNum, HLP0 + 2).value = g.cel;    // Y
+      sh4.getCell(rowNum, HLP0 + 3).value = g.mes;    // Z
+      sh4.getCell(rowNum, HLP0 + 4).value = g.onTime; // AA
+      sh4.getCell(rowNum, HLP0 + 5).value = g.late;   // AB
     });
-
-    // ── Fin del bloque CI: la tabla visible y las columnas ocultas de la gráfica pueden tener
-    // distinto largo; tomamos la más larga para saber dónde termina el bloque.
-    const ciBlockEnd = ciDataStart + Math.max(completedR4.length, ciGroups.length) - 1;
-    // ── Resumen por Cliente — título general, debajo del bloque CI (gráfica + tabla)
-    const cliTitleRow = ciBlockEnd + GAP;
-    sh4.mergeCells(cliTitleRow, 1, cliTitleRow, 8);
-    Object.assign(sh4.getCell(cliTitleRow, 1), {
-      value:'Resumen por Cliente',
-      font:{bold:true,size:14,color:{argb:C.white}},
-      fill:{type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}},
-      alignment:{horizontal:'center',vertical:'middle'}
-    });
-    sh4.getRow(cliTitleRow).height=36; sh4.getRow(cliTitleRow+1).height=8;
 
     // Clasificación: verde = a tiempo, rojo = con retraso, amarillo = TBD (sin Fecha Real)
     const catOf  = r => r.sopReal ? ((r.sopPlaneado && r.sopReal > r.sopPlaneado) ? 'rojo' : 'verde') : 'amarillo';
@@ -1422,14 +1416,14 @@ async function exportToExcel() {
     });
 
     // Tabla: outer | Cliente | Fecha Planeada (verde) | Fecha Real (rojo) | TBD (amarillo)
-    function writeClientTable4(startRow, titleText, outerHdr, rows) {
-      sh4.mergeCells(startRow, 1, startRow, 5);
-      const tC = sh4.getCell(startRow, 1);
+    function writeClientTable4(startRow, C0, titleText, outerHdr, rows) {
+      sh4.mergeCells(startRow, C0, startRow, C0 + 4);
+      const tC = sh4.getCell(startRow, C0);
       tC.value=titleText; tC.font={bold:true,size:11,color:{argb:C.white}};
       tC.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueMed}};
       tC.alignment={horizontal:'center',vertical:'middle'};
       [outerHdr,'Cliente','Fecha Planeada','Fecha Real','TBD'].forEach((h,i)=>{
-        const c=sh4.getCell(startRow+1, 1+i);
+        const c=sh4.getCell(startRow+1, C0+i);
         c.value=h; c.font={bold:true,color:{argb:C.white},size:10};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.blueDark}};
         c.alignment={horizontal:'center',vertical:'middle'};
@@ -1437,7 +1431,7 @@ async function exportToExcel() {
       rows.forEach((rw,i)=>{
         const bg=i%2===0?C.gray:'FFFFFFFF';
         [rw.outer, rw.cli, rw.verde, rw.rojo, rw.amarillo].forEach((v,ci)=>{
-          const c=sh4.getCell(startRow+2+i, 1+ci);
+          const c=sh4.getCell(startRow+2+i, C0+ci);
           c.value=v;
           c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
           if (ci>=2) c.alignment={horizontal:'center'};
@@ -1446,17 +1440,19 @@ async function exportToExcel() {
       sh4.getRow(startRow).height=20; sh4.getRow(startRow+1).height=18;
       return startRow+1+rows.length; // última fila con datos
     }
-    // Sección Semanal: gráfica arriba (chart3Top) y su tabla debajo
-    const chart3Top   = cliTitleRow + 2;                  // filas en blanco donde se ancla la gráfica semanal
-    const semStartG   = chart3Top + CHART_ROWS + GAP;     // título de la tabla semanal
-    const lastSemRowG = writeClientTable4(semStartG,'Resumen por Cliente Semanal','Semana',wkRows);
-    // Sección Anual: gráfica arriba (chart4Top) y su tabla debajo
-    const chart4Top   = lastSemRowG + GAP;                // filas en blanco donde se ancla la gráfica anual
+    // ── IZQUIERDA: Semanal arriba (misma fila que la tabla CI) en cols F-J (C0=6)
+    const SEM_C0      = 6;
+    const semGChartTop= 1;                                // fila (0-based en drawing) donde se ancla la gráfica semanal
+    const semStartG   = ciTitleRow;                       // título tabla semanal alineado con tabla CI (fila 23)
+    const lastSemRowG = writeClientTable4(semStartG, SEM_C0, 'Resumen por Cliente Semanal','Semana',wkRows);
+    // ── IZQUIERDA: Anual debajo de la tabla semanal, en cols A-E (C0=1)
+    const ANO_C0      = 1;
+    const chart4Top   = lastSemRowG + GAP + 1;            // filas en blanco donde se ancla la gráfica anual
     const anoStartG   = chart4Top + CHART_ROWS + GAP;     // título de la tabla anual
-    const lastAnoRowG = writeClientTable4(anoStartG,'Resumen Anual por Cliente','Año',yrRows);
+    const lastAnoRowG = writeClientTable4(anoStartG, ANO_C0, 'Resumen Anual por Cliente','Año',yrRows);
 
-    // ── CHART6: Cambios de Ingeniería — barra agregada por grupo, eje multinivel (Semana/Plataforma/Célula/Mes)
-    // Data lives in hidden cols I(9)–N(14), rows 3 to 2+n4 (una fila por barra)
+    // ── CHART6: Resumen por celula mensual — barra agregada por grupo, eje multinivel (Mes/Célula/Plataforma/Semana)
+    // Data lives in hidden cols W(23)–AB(28), una fila por barra
     const n4 = ciGroups.length;
     const xmlEsc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const ptList = (arr) => arr.map((v,i) => `<c:pt idx="${i}"><c:v>${xmlEsc(v)}</c:v></c:pt>`).join('');
@@ -1470,9 +1466,9 @@ async function exportToExcel() {
     const lastRow4 = ciDataStart + n4 - 1;
     // Etiquetas de datos: solo se muestra el conteo cuando es > 0 (formato "0;;;")
     const DLBLS = `<c:dLbls><c:numFmt formatCode="0;;;" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr b="1"/></a:pPr><a:endParaRPr lang="es-MX"/></a:p></c:txPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
-    const multiLvlCat = n4 === 0 ? '<c:numRef><c:f>Graficas!$I$3</c:f></c:numRef>' :
+    const multiLvlCat = n4 === 0 ? '<c:numRef><c:f>Graficas!$W$3</c:f></c:numRef>' :
       `<c:multiLvlStrRef>
-<c:f>&apos;Graficas&apos;!$I$${ciDataStart}:$L$${lastRow4}</c:f>
+<c:f>&apos;Graficas&apos;!$W$${ciDataStart}:$Z$${lastRow4}</c:f>
 <c:multiLvlStrCache>
 <c:ptCount val="${n4}"/>
 <c:lvl>${ptList(mesLvl)}</c:lvl>
@@ -1491,19 +1487,19 @@ async function exportToExcel() {
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
 <c:ser>
 <c:idx val="0"/><c:order val="0"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$AA$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="0070C0"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
-<c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$${ciDataStart}:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$AA$${ciDataStart}:$AA$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:ser>
 <c:idx val="1"/><c:order val="1"/>
-<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$AB$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="92D050"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
-<c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$${ciDataStart}:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$AB$${ciDataStart}:$AB$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:axId val="11"/><c:axId val="12"/>
 </c:barChart>
@@ -1518,11 +1514,13 @@ ${DLBLS}
 
     // ── CHART3/CHART4: Resumen por Cliente — barra apilada, eje multinivel (período→cliente),
     // series verde (Fecha Planeada / a tiempo), rojo (Fecha Real / retraso), amarillo (TBD)
-    const stacked3Xml = (title, dataStart, lastRow, rows) => {
+    const colL = n => { let s=''; while(n>0){ s=String.fromCharCode(65+(n-1)%26)+s; n=Math.floor((n-1)/26); } return s; };
+    const stacked3Xml = (title, dataStart, lastRow, rows, C0) => {
       const n = rows.length;
-      const cat = n === 0 ? `<c:numRef><c:f>Graficas!$A$${dataStart}</c:f></c:numRef>` :
+      const cOuter=colL(C0), cCli=colL(C0+1), cV=colL(C0+2), cR=colL(C0+3), cA=colL(C0+4);
+      const cat = n === 0 ? `<c:numRef><c:f>Graficas!$${cOuter}$${dataStart}</c:f></c:numRef>` :
         `<c:multiLvlStrRef>
-<c:f>&apos;Graficas&apos;!$A$${dataStart}:$B$${lastRow}</c:f>
+<c:f>&apos;Graficas&apos;!$${cOuter}$${dataStart}:$${cCli}$${lastRow}</c:f>
 <c:multiLvlStrCache>
 <c:ptCount val="${n}"/>
 <c:lvl>${ptList(rows.map(x=>x.cli))}</c:lvl>
@@ -1544,9 +1542,9 @@ ${DLBLS}
 <c:plotArea>
 <c:barChart>
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
-${ser(0,'Fecha Planeada','0070C0','C',rows.map(x=>x.verde))}
-${ser(1,'Fecha Real','92D050','D',rows.map(x=>x.rojo))}
-${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
+${ser(0,'Fecha Planeada','0070C0',cV,rows.map(x=>x.verde))}
+${ser(1,'Fecha Real','92D050',cR,rows.map(x=>x.rojo))}
+${ser(2,'TBD','eab308',cA,rows.map(x=>x.amarillo))}
 <c:overlap val="100"/>
 <c:axId val="21"/><c:axId val="22"/>
 </c:barChart>
@@ -1559,19 +1557,18 @@ ${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>
 </c:chartSpace>`;
     };
-    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows);
-    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows);
+    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows, SEM_C0);
+    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows, ANO_C0);
 
     // Drawing2: charts on Graficas sheet — anclados debajo de la última tabla
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
 `<xdr:twoCellAnchor moveWithCells="1"><xdr:from><xdr:col>${col0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${col1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
-    // Cada gráfica se ancla en las filas en blanco justo arriba de su tabla.
-    // Las filas del dibujo son base-0 (fila de la hoja - 1).
+    // Layout 2 columnas (filas base-0): Semanal arriba-izq, celula mensual arriba-der, Anual abajo-izq.
     const DRAWING2_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
-${mkAnchor(0,8,0,CHART_ROWS,1,'rId4')}
-${mkAnchor(0,8,chart3Top-1,chart3Top-1+CHART_ROWS,2,'rId1')}
-${mkAnchor(0,8,chart4Top-1,chart4Top-1+CHART_ROWS,3,'rId2')}
+${mkAnchor(14,22,1,20,1,'rId4')}
+${mkAnchor(0,14,0,21,2,'rId1')}
+${mkAnchor(0,14,chart4Top-1,chart4Top-1+CHART_ROWS,3,'rId2')}
 </xdr:wsDr>`;
     const DRAWING2_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
