@@ -1552,7 +1552,7 @@ ${DLBLS}
     // ── CHART3/CHART4: Resumen por Cliente — barra apilada, eje multinivel (período→cliente),
     // series verde (Fecha Planeada / a tiempo), rojo (Fecha Real / retraso), amarillo (TBD)
     const colL = n => { let s=''; while(n>0){ s=String.fromCharCode(65+(n-1)%26)+s; n=Math.floor((n-1)/26); } return s; };
-    const stacked3Xml = (title, dataStart, lastRow, rows, C0, cols) => {
+    const stacked3Xml = (title, dataStart, lastRow, rows, C0, cols, showGrid=true) => {
       const n = rows.length;
       const cOuter=colL(C0), cCli=colL(C0+1);
       const cat = n === 0 ? `<c:numRef><c:f>Graficas!$${cOuter}$${dataStart}</c:f></c:numRef>` :
@@ -1568,6 +1568,7 @@ ${DLBLS}
 <c:idx val="${idx}"/><c:order val="${idx}"/>
 <c:tx><c:v>${name}</c:v></c:tx>
 <c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+${DLBLS}
 <c:cat>${cat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$${col}$${dataStart}:$${col}$${lastRow}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n}"/>${numPtList(vals)}</c:numCache></c:numRef></c:val>
 </c:ser>`;
@@ -1584,7 +1585,7 @@ ${cols.map((c,i)=>ser(i,c.name,c.color,colL(C0+2+i),rows.map(x=>x[c.key]))).join
 <c:axId val="21"/><c:axId val="22"/>
 </c:barChart>
 <c:catAx><c:axId val="21"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="22"/></c:catAx>
-<c:valAx><c:axId val="22"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:majorUnit val="1"/><c:numFmt formatCode="0" sourceLinked="0"/><c:crossAx val="21"/></c:valAx>
+<c:valAx><c:axId val="22"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/>${showGrid?'<c:majorGridlines/>':''}<c:majorUnit val="1"/><c:numFmt formatCode="0" sourceLinked="0"/><c:crossAx val="21"/></c:valAx>
 </c:plotArea>
 <c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>
 <c:plotVisOnly val="1"/>
@@ -1592,8 +1593,8 @@ ${cols.map((c,i)=>ser(i,c.name,c.color,colL(C0+2+i),rows.map(x=>x[c.key]))).join
 <c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>
 </c:chartSpace>`;
     };
-    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows, SEM_C0, WEEK_COLS);
-    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows, ANO_C0, YEAR_COLS);
+    const CHART3_XML = stacked3Xml('Resumen por Cliente Semanal', semStartG+2, lastSemRowG, wkRows, SEM_C0, WEEK_COLS, true);
+    const CHART4_XML = stacked3Xml('Resumen Anual por Cliente',   anoStartG+2, lastAnoRowG, yrRows, ANO_C0, YEAR_COLS, false);
 
     // Drawing2: charts on Graficas sheet — anclados debajo de la última tabla
     const mkAnchor = (col0,col1,row0,row1,id,rid) =>
