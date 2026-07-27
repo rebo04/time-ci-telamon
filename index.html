@@ -1484,7 +1484,7 @@ async function exportToExcel() {
     const CHART6_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace ${NS_C} ${NS_A} ${NS_R}>
 <c:chart>
-<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Cambios de Ingeniería</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Resumen por celula mensual</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
 <c:autoTitleDeleted val="0"/>
 <c:plotArea>
 <c:barChart>
@@ -1492,7 +1492,7 @@ async function exportToExcel() {
 <c:ser>
 <c:idx val="0"/><c:order val="0"/>
 <c:tx><c:strRef><c:f>&apos;Graficas&apos;!$M$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha Planeada - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
-<c:spPr><a:solidFill><a:srgbClr val="22c55e"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+<c:spPr><a:solidFill><a:srgbClr val="0070C0"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$M$${ciDataStart}:$M$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(onTimeV)}</c:numCache></c:numRef></c:val>
@@ -1500,7 +1500,7 @@ ${DLBLS}
 <c:ser>
 <c:idx val="1"/><c:order val="1"/>
 <c:tx><c:strRef><c:f>&apos;Graficas&apos;!$N$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Fecha real - ${CUR_YEAR}</c:v></c:pt></c:strCache></c:strRef></c:tx>
-<c:spPr><a:solidFill><a:srgbClr val="ef4444"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+<c:spPr><a:solidFill><a:srgbClr val="92D050"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$N$${ciDataStart}:$N$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
@@ -1544,8 +1544,8 @@ ${DLBLS}
 <c:plotArea>
 <c:barChart>
 <c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>
-${ser(0,'Fecha Planeada','22c55e','C',rows.map(x=>x.verde))}
-${ser(1,'Fecha Real','ef4444','D',rows.map(x=>x.rojo))}
+${ser(0,'Fecha Planeada','0070C0','C',rows.map(x=>x.verde))}
+${ser(1,'Fecha Real','92D050','D',rows.map(x=>x.rojo))}
 ${ser(2,'TBD','eab308','E',rows.map(x=>x.amarillo))}
 <c:overlap val="100"/>
 <c:axId val="21"/><c:axId val="22"/>
