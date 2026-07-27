@@ -1404,15 +1404,18 @@ async function exportToExcel() {
     const catOf  = r => r.sopReal ? ((r.sopPlaneado && r.sopReal > r.sopPlaneado) ? 'rojo' : 'verde') : 'amarillo';
     const wkOf = ds => { const d=new Date(ds+'T12:00:00'); const st=new Date(d.getFullYear(),0,1); return Math.ceil(((d-st)/86400000+st.getDay()+1)/7); };
 
-    // Agrupar semana→cliente (año actual) y año→cliente (todos)
+    // Agrupar año→cliente (TODOS los registros del Time C-Ing) y semana→cliente (año actual).
+    // Se incluyen los CIs sin fecha (sin SOP Real ni Planeada): se agrupan bajo "Abierto"
+    // y cuentan como TBD, igual que la columna Año del Time C-Ing (calcAno → 'Abierto').
     const wkMap = {}, yrMap = {};
     records.forEach(r => {
-      const ds = ciDate4(r); if (!ds) return;
       const cli = r.platform || 'N/A';
       const cat = catOf(r);
-      const yk = ds.slice(0,4) + '|' + cli;
+      const ds  = ciDate4(r);
+      const yr  = ds ? ds.slice(0,4) : 'Abierto';
+      const yk  = yr + '|' + cli;
       (yrMap[yk] = yrMap[yk] || {verde:0,rojo:0,amarillo:0})[cat]++;
-      if (ds.startsWith(CUR_YEAR)) {
+      if (ds && ds.startsWith(CUR_YEAR)) {
         const wkk = String(wkOf(ds)).padStart(2,'0') + '|' + cli;
         (wkMap[wkk] = wkMap[wkk] || {verde:0,rojo:0,amarillo:0})[cat]++;
       }
