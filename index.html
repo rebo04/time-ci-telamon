@@ -1319,7 +1319,7 @@ async function exportToExcel() {
       {width:3},{width:3},{width:3},{width:3},                  // K-N  espaciador
       {width:12},{width:16},{width:13},{width:13},{width:10},{width:40},{width:40}, // O-U tabla CI
       {width:2},                                                // V    espaciador
-      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1} // W-AB datos ocultos gráfica CI
+      {width:1},{width:1},{width:1},{width:1},{width:1},{width:1},{width:1} // W-AC datos ocultos gráfica CI
     ];
     // ── Layout de 2 columnas (como el Excel de referencia):
     //   IZQUIERDA (A-J): gráfica Semanal arriba + tabla Semanal, luego gráfica Anual + tabla Anual
@@ -1347,6 +1347,7 @@ async function exportToExcel() {
     const CUR_YEAR = String(new Date().getFullYear());
     sh4.getCell(2, HLP0 + 4).value = 'Fecha Planeada - ' + CUR_YEAR;
     sh4.getCell(2, HLP0 + 5).value = 'Fecha real - ' + CUR_YEAR;
+    sh4.getCell(2, HLP0 + 6).value = 'TBD';
     const ciDate4 = r => r.sopReal || r.sopPlaneado || '';
     // Tabla Resumen: solo CIs completados (con Fecha Real) del año actual
     const completedR4 = records
@@ -1367,18 +1368,27 @@ async function exportToExcel() {
       });
     });
 
-    // Agregación para la gráfica CI: una barra por (Semana, Plataforma, Célula, Mes) con el conteo
+    // Agregación para la gráfica CI: una barra por (Semana, Plataforma, Célula, Mes) con el conteo.
+    // Incluye CIs completados (A tiempo / Retraso) y pendientes sin Fecha Real (TBD);
+    // se ubica cada CI por su Fecha Real, o por Fecha Planeada como respaldo (para los TBD).
+    const mesOfDs = ds => MONTH_SHORT[new Date(ds+'T12:00:00').getMonth()];
+    const semOfDs = ds => { const d=new Date(ds+'T12:00:00'); const st=new Date(d.getFullYear(),0,1); return Math.ceil(((d-st)/86400000+st.getDay()+1)/7); };
+    const chartR4 = records.filter(r => { const ds = r.sopReal || r.sopPlaneado; return ds && ds.startsWith(CUR_YEAR); });
     const gMap = new Map();
-    completedR4.forEach(r => {
-      const sem = String(calcSemana(r)||'');
-      const key = [sem, r.platform||'', r.cell||'', calcMes(r)||''].join('|');
-      const g = gMap.get(key) || {sem, plat:r.platform||'', cel:r.cell||'', mes:calcMes(r)||'', onTime:0, late:0};
-      if (r.sopPlaneado && r.sopReal <= r.sopPlaneado) g.onTime++; else g.late++;
+    chartR4.forEach(r => {
+      const ds  = r.sopReal || r.sopPlaneado;
+      const sem = String(semOfDs(ds)||'');
+      const mes = mesOfDs(ds)||'';
+      const key = [sem, r.platform||'', r.cell||'', mes].join('|');
+      const g = gMap.get(key) || {sem, plat:r.platform||'', cel:r.cell||'', mes, onTime:0, late:0, tbd:0};
+      if (!r.sopReal) g.tbd++;
+      else if (r.sopPlaneado && r.sopReal <= r.sopPlaneado) g.onTime++;
+      else g.late++;
       gMap.set(key, g);
     });
     const ciGroups = [...gMap.values()].sort((a,b) =>
       (Number(a.sem)-Number(b.sem)) || a.plat.localeCompare(b.plat) || a.cel.localeCompare(b.cel));
-    // Helper cols ocultos para la gráfica CI (una fila por barra): W=Semana X=Plataforma Y=Célula Z=Mes AA=A tiempo AB=Retraso
+    // Helper cols ocultos para la gráfica CI (una fila por barra): W=Semana X=Plataforma Y=Célula Z=Mes AA=A tiempo AB=Retraso AC=TBD
     ciGroups.forEach((g, i) => {
       const rowNum = ciDataStart + i;
       sh4.getCell(rowNum, HLP0    ).value = g.sem;    // W
@@ -1387,6 +1397,7 @@ async function exportToExcel() {
       sh4.getCell(rowNum, HLP0 + 3).value = g.mes;    // Z
       sh4.getCell(rowNum, HLP0 + 4).value = g.onTime; // AA
       sh4.getCell(rowNum, HLP0 + 5).value = g.late;   // AB
+      sh4.getCell(rowNum, HLP0 + 6).value = g.tbd;    // AC
     });
 
     // Clasificación: verde = a tiempo, rojo = con retraso, amarillo = TBD (sin Fecha Real)
@@ -1463,6 +1474,7 @@ async function exportToExcel() {
     const semLvl   = ciGroups.map(g => g.sem);
     const onTimeV  = ciGroups.map(g => g.onTime);
     const delayedV = ciGroups.map(g => g.late);
+    const tbdV     = ciGroups.map(g => g.tbd);
     const lastRow4 = ciDataStart + n4 - 1;
     // Etiquetas de datos: solo se muestra el conteo cuando es > 0 (formato "0;;;")
     const DLBLS = `<c:dLbls><c:numFmt formatCode="0;;;" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr b="1"/></a:pPr><a:endParaRPr lang="es-MX"/></a:p></c:txPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
@@ -1500,6 +1512,14 @@ ${DLBLS}
 ${DLBLS}
 <c:cat>${multiLvlCat}</c:cat>
 <c:val><c:numRef><c:f>&apos;Graficas&apos;!$AB$${ciDataStart}:$AB$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(delayedV)}</c:numCache></c:numRef></c:val>
+</c:ser>
+<c:ser>
+<c:idx val="2"/><c:order val="2"/>
+<c:tx><c:strRef><c:f>&apos;Graficas&apos;!$AC$2</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>TBD</c:v></c:pt></c:strCache></c:strRef></c:tx>
+<c:spPr><a:solidFill><a:srgbClr val="eab308"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>
+${DLBLS}
+<c:cat>${multiLvlCat}</c:cat>
+<c:val><c:numRef><c:f>&apos;Graficas&apos;!$AC$${ciDataStart}:$AC$${lastRow4}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n4}"/>${numPtList(tbdV)}</c:numCache></c:numRef></c:val>
 </c:ser>
 <c:axId val="11"/><c:axId val="12"/>
 </c:barChart>
